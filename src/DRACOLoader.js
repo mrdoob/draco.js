@@ -90,9 +90,35 @@ class DRACOLoader extends Loader {
 
 	}
 
+	// Promise-returning wrapper for `load()`. Resolves with the parsed
+	// geometry; rejects with the same error that the onError callback would
+	// have received. Mirrors the API contract documented in the README.
+	loadAsync( url, onProgress ) {
+
+		return new Promise( ( resolve, reject ) => {
+
+			this.load( url, resolve, onProgress, reject );
+
+		} );
+
+	}
+
 	parse( buffer, onLoad, onError = () => {} ) {
 
 		this.decodeDracoFile( buffer, onLoad, null, null, SRGBColorSpace, onError ).catch( onError );
+
+	}
+
+	// Promise-returning wrapper for `parse()`. Resolves with the parsed
+	// geometry; rejects with the same error that the onError callback would
+	// have received.
+	parseAsync( buffer ) {
+
+		return new Promise( ( resolve, reject ) => {
+
+			this.parse( buffer, resolve, reject );
+
+		} );
 
 	}
 
