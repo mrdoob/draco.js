@@ -147,7 +147,13 @@ class DRACOLoader extends Loader {
 
 				return cachedTask.promise;
 
-			} else if ( buffer.byteLength === 0 ) {
+			}
+
+			// A transferred (zero-length) buffer cannot be decoded again:
+			// the underlying ArrayBuffer has been detached. Surface a
+			// clear error rather than silently returning the previous
+			// result.
+			if ( buffer.byteLength === 0 ) {
 
 				throw new Error(
 
@@ -157,6 +163,12 @@ class DRACOLoader extends Loader {
 				);
 
 			}
+
+			// A new decode with different settings supersedes the cached
+			// one. Drop the stale entry so the new decode below replaces
+			// it cleanly. (The previous behaviour returned the cached
+			// geometry, which silently ignored the new options.)
+			_taskCache.delete( buffer );
 
 		}
 
