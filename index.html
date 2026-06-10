@@ -80,8 +80,8 @@
         <tr><th>Metric</th><th class="wasm">WASM</th><th class="js">JS</th><th></th></tr>
       </thead>
       <tbody>
-        <tr><td>loader size</td><td class="wasm" id="wasm-gzip">–</td><td class="js" id="js-gzip">–</td><td id="size-ratio">–</td></tr>
-        <tr><td>load + init</td><td class="wasm" id="wasm-load">–</td><td class="js" id="js-load">–</td><td id="load-ratio">–</td></tr>
+        <tr><td>size</td><td class="wasm" id="wasm-gzip">–</td><td class="js" id="js-gzip">–</td><td id="size-ratio">–</td></tr>
+        <tr><td>load</td><td class="wasm" id="wasm-load">–</td><td class="js" id="js-load">–</td><td id="load-ratio">–</td></tr>
         <tr><td>parse</td><td class="wasm" id="wasm-parse">–</td><td class="js" id="js-parse">–</td><td id="parse-ratio">–</td></tr>
         <tr><td>total</td><td class="wasm" id="wasm-total">–</td><td class="js" id="js-total">–</td><td id="total-ratio">–</td></tr>
       </tbody>
@@ -371,27 +371,21 @@ function parseGLTF(gltfLoader, data) {
 }
 
 async function initLoaders() {
-  // A tiny model used to force each decoder to its ready state (the WASM one
-  // fetches + instantiates its .wasm lazily), so "loader load" reflects the
-  // real cold-start cost a user pays before the first decode.
-  const warmup = await (await fetch('./samples/cube.drc')).arrayBuffer();
-
-  // JS loader (this project's minified build — what you'd ship).
+  // Cold comparison — nothing is pre-warmed. "load" is the module download +
+  // parse + eval. The real readiness cost (the JS loader spawning its worker,
+  // the WASM loader fetching + instantiating its .wasm) is not paid here — it
+  // lands in the first decode below, exactly as a real first-time user does.
   let t0 = performance.now();
   const jsMod = await import('./build/DRACOLoader.min.js');
-  jsLoader = new jsMod.DRACOLoader();
-  (await decodeOne(jsLoader, warmup.slice(0), null, null)).dispose();
   info.js.load = performance.now() - t0;
+  jsLoader = new jsMod.DRACOLoader();
 
-  // preload() doesn't await the wasm, so force readiness with a warmup decode.
   t0 = performance.now();
   const wasmMod = await import('./libs/draco/DRACOLoader.js');
+  info.wasm.load = performance.now() - t0;
   wasmLoader = new wasmMod.DRACOLoader();
   wasmLoader.setDecoderConfig({ type: 'wasm' });
   wasmLoader.setDecoderPath(DRACO_PATH);
-  wasmLoader.preload();
-  (await decodeOne(wasmLoader, warmup.slice(0), null, null)).dispose();
-  info.wasm.load = performance.now() - t0;
 
   // glTF loaders for the visual: same GLTFLoader, one driven by each Draco
   // decoder, so the rendered materials/textures are identical and only the
@@ -446,7 +440,7 @@ async function processModel(name, fileData) {
     const wasm = await decodeModel(wasmLoader, parts);
     $('wasm-parse').textContent = fmtMs(wasm.ms);
 
-    // total = one-time loader cold-start + this model's parse.
+    // total = module load + this model's (cold) first decode.
     const jsTotal = info.js.load + js.ms;
     const wasmTotal = info.wasm.load + wasm.ms;
     $('js-total').textContent = fmtMs(jsTotal);
