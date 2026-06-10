@@ -1234,19 +1234,30 @@ class RAnsDecoder {
     // shrinking the table (up to 4x) keeps that random access closer to cache.
     const LutArray = numSymbols <= 256 ? Uint8Array
       : (numSymbols <= 65536 ? Uint16Array : Uint32Array);
-    this.lutTable = new LutArray(this.ransPrecision);
-    this.probTable = new Uint32Array(numSymbols);
-    this.cumProbTable = new Uint32Array(numSymbols);
+    const lutTable = new LutArray(this.ransPrecision);
+    const probTable = new Uint32Array(numSymbols);
+    const cumProbTable = new Uint32Array(numSymbols);
+    this.lutTable = lutTable;
+    this.probTable = probTable;
+    this.cumProbTable = cumProbTable;
     let cumProb = 0;
     let actProb = 0;
     for (let i = 0; i < numSymbols; ++i) {
-      this.probTable[i] = tokenProbs[i];
-      this.cumProbTable[i] = cumProb;
-      cumProb += tokenProbs[i];
+      const prob = tokenProbs[i];
+      probTable[i] = prob;
+      cumProbTable[i] = cumProb;
+      cumProb += prob;
       if (cumProb > this.ransPrecision) {
         return false;
       }
-      this.lutTable.fill(i, actProb, cumProb);
+      // Manual loop for short runs: fill()'s per-call overhead dominates them.
+      if (prob < 32) {
+        for (let j = actProb; j < cumProb; ++j) {
+          lutTable[j] = i;
+        }
+      } else {
+        lutTable.fill(i, actProb, cumProb);
+      }
       actProb = cumProb;
     }
     if (cumProb !== this.ransPrecision) {
@@ -1299,38 +1310,43 @@ class RAnsSymbolDecoder {
       return false;
     }
 
-    this.probabilityTable_ = new Uint32Array(this.numSymbols_);
-    if (this.numSymbols_ === 0) {
+    const numSymbols = this.numSymbols_;
+    const probabilityTable = new Uint32Array(numSymbols);
+    this.probabilityTable_ = probabilityTable;
+    if (numSymbols === 0) {
       return true;
     }
 
-    for (let i = 0; i < this.numSymbols_; ++i) {
-      const probData = buffer.decodeUint8();
-      if (probData === undefined) return false;
+    // Read via a local cursor instead of a decodeUint8() call per byte.
+    const data = buffer.data;
+    const startPos = buffer.decodedSize;
+    const endPos = startPos + buffer.remainingSize;
+    let pos = startPos;
+    for (let i = 0; i < numSymbols; ++i) {
+      if (pos >= endPos) return false;
+      const probData = data[pos++];
 
       // Low 2 bits = token: 0-2 is the extra-byte count, 3 is run-length of zero-prob entries.
       const token = probData & 3;
       if (token === 3) {
         const offset = probData >> 2;
-        if (i + offset >= this.numSymbols_) {
+        if (i + offset >= numSymbols) {
           return false;
         }
-        for (let j = 0; j < offset + 1; ++j) {
-          this.probabilityTable_[i + j] = 0;
-        }
+        // The run's probabilities stay 0; the freshly allocated table already is.
         i += offset;
       } else {
         const extraBytes = token;
         let prob = probData >> 2;
         for (let b = 0; b < extraBytes; ++b) {
-          const eb = buffer.decodeUint8();
-          if (eb === undefined) return false;
+          if (pos >= endPos) return false;
           // Shift 8 bits per extra byte, minus 2 for the two token bits.
-          prob |= eb << (8 * (b + 1) - 2);
+          prob |= data[pos++] << (8 * (b + 1) - 2);
         }
-        this.probabilityTable_[i] = prob;
+        probabilityTable[i] = prob;
       }
     }
+    buffer.advance(pos - startPos);
 
     if (!this.ans_.ransBuildLookUpTable(this.probabilityTable_, this.numSymbols_)) {
       return false;
