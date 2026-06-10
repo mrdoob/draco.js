@@ -27,6 +27,15 @@ for (const instance of [
   THREE.ColorManagement,
 ]) collectProps(instance, boundary);
 
+// DRACOLoader destructures these names from a dynamic `import('three')`; they
+// become property accesses on the module namespace, so reserve exactly the set
+// read in src/DRACOLoader.js (keep in sync with the destructure there) —
+// otherwise the property mangler renames them and the build breaks.
+for (const name of [
+  'BufferAttribute', 'BufferGeometry', 'Color', 'ColorManagement',
+  'FileLoader', 'Loader', 'LinearSRGBColorSpace', 'SRGBColorSpace'
+]) boundary.add(name);
+
 for (const name of [
   // Public DRACOLoader API.
   'load', 'parse', 'parseAsync', 'loadAsync', 'decodeDracoFile', 'decodeGeometry',
