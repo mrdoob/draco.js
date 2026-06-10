@@ -105,6 +105,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // three.js's Draco decoder, vendored locally (libs/draco/).
@@ -388,9 +389,13 @@ async function initLoaders() {
 
   // glTF loaders for the visual: same GLTFLoader, one driven by each Draco
   // decoder, so the rendered materials/textures are identical and only the
-  // geometry decoder differs across the split.
-  gltfLoaderJS = new GLTFLoader().setDRACOLoader(jsLoader);
-  gltfLoaderWASM = new GLTFLoader().setDRACOLoader(wasmLoader);
+  // geometry decoder differs across the split. A shared KTX2Loader decodes
+  // basis-compressed (KHR_texture_basisu) textures.
+  const ktx2 = new KTX2Loader()
+    .setTranscoderPath('https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/libs/basis/')
+    .detectSupport(renderer);
+  gltfLoaderJS = new GLTFLoader().setDRACOLoader(jsLoader).setKTX2Loader(ktx2);
+  gltfLoaderWASM = new GLTFLoader().setDRACOLoader(wasmLoader).setKTX2Loader(ktx2);
 
   // Loader payload sizes (decoder only; three.js excluded from both). The WASM
   // loader ships as three separately-transferred files, so sum them.
