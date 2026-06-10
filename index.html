@@ -371,10 +371,7 @@ function parseGLTF(gltfLoader, data) {
 }
 
 async function initLoaders() {
-  // Cold comparison — nothing is pre-warmed. "load" is the module download +
-  // parse + eval. The real readiness cost (the JS loader spawning its worker,
-  // the WASM loader fetching + instantiating its .wasm) is not paid here — it
-  // lands in the first decode below, exactly as a real first-time user does.
+  // "load" only downloads the decoder; the cold first decode does the rest.
   let t0 = performance.now();
   const jsMod = await import('./build/DRACOLoader.min.js');
   info.js.load = performance.now() - t0;
@@ -382,10 +379,12 @@ async function initLoaders() {
 
   t0 = performance.now();
   const wasmMod = await import('./libs/draco/DRACOLoader.js');
-  info.wasm.load = performance.now() - t0;
   wasmLoader = new wasmMod.DRACOLoader();
   wasmLoader.setDecoderConfig({ type: 'wasm' });
   wasmLoader.setDecoderPath(DRACO_PATH);
+  wasmLoader.preload();              // fetch draco_decoder.wasm (no instantiate)
+  await wasmLoader.decoderPending;   // wait for the download only
+  info.wasm.load = performance.now() - t0;
 
   // glTF loaders for the visual: same GLTFLoader, one driven by each Draco
   // decoder, so the rendered materials/textures are identical and only the
