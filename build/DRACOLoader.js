@@ -37,7 +37,6 @@ const SequentialAttributeEncoderType = {
 
 const PredictionSchemeMethod = {
   PREDICTION_NONE: -2,
-  PREDICTION_DIFFERENCE: 0,
   MESH_PREDICTION_PARALLELOGRAM: 1,
   MESH_PREDICTION_MULTI_PARALLELOGRAM: 2,
   MESH_PREDICTION_CONSTRAINED_MULTI_PARALLELOGRAM: 4,
@@ -2264,15 +2263,10 @@ class SequentialAttributeDecoder {
 
 // compression/attributes/prediction_schemes/PredictionSchemeDecoderInterface.js - ported from compression/attributes/prediction_schemes/prediction_scheme_decoder_interface.h
 
-
 /**
  * Abstract interface for prediction schemes used during attribute decoding.
  */
 class PredictionSchemeDecoderInterface {
-
-  getPredictionMethod() {
-    return PredictionSchemeMethod.PREDICTION_NONE;
-  }
 
   isInitialized() {
     return false;
@@ -2358,10 +2352,6 @@ class PredictionSchemeDeltaDecoder extends PredictionSchemeDecoder {
     super(attribute, transform);
   }
 
-  getPredictionMethod() {
-    return PredictionSchemeMethod.PREDICTION_DIFFERENCE;
-  }
-
   isInitialized() {
     return true;
   }
@@ -2418,10 +2408,6 @@ class MeshPredictionSchemeParallelogramDecoder extends MeshPredictionSchemeDecod
 
   constructor(attribute, transform, meshData) {
     super(attribute, transform, meshData);
-  }
-
-  getPredictionMethod() {
-    return PredictionSchemeMethod.MESH_PREDICTION_PARALLELOGRAM;
   }
 
   isInitialized() {
@@ -2870,10 +2856,6 @@ class MeshPredictionSchemeMultiParallelogramDecoder extends MeshPredictionScheme
     super(attribute, transform, meshData);
   }
 
-  getPredictionMethod() {
-    return PredictionSchemeMethod.MESH_PREDICTION_MULTI_PARALLELOGRAM;
-  }
-
   isInitialized() {
     return this._meshData.isInitialized();
   }
@@ -3028,10 +3010,6 @@ class MeshPredictionSchemeConstrainedMultiParallelogramDecoder extends MeshPredi
     for (let i = 0; i < MAX_NUM_PARALLELOGRAMS; ++i) {
       this._isCreaseEdge.push([]);
     }
-  }
-
-  getPredictionMethod() {
-    return PredictionSchemeMethod.MESH_PREDICTION_CONSTRAINED_MULTI_PARALLELOGRAM;
   }
 
   isInitialized() {
@@ -3497,10 +3475,6 @@ class MeshPredictionSchemeTexCoordsPortableDecoder extends MeshPredictionSchemeD
     this._predictor = new MeshPredictionSchemeTexCoordsPortablePredictor(meshData);
   }
 
-  getPredictionMethod() {
-    return PredictionSchemeMethod.MESH_PREDICTION_TEX_COORDS_PORTABLE;
-  }
-
   isInitialized() {
     if (!this._predictor.isInitialized()) return false;
     if (!this._meshData.isInitialized()) return false;
@@ -3947,10 +3921,6 @@ class MeshPredictionSchemeGeometricNormalDecoder extends MeshPredictionSchemeDec
     this._predictor = new MeshPredictionSchemeGeometricNormalPredictorArea(meshData);
     this._octahedronToolBox = new OctahedronToolBox();
     this._flipNormalBitDecoder = new RAnsBitDecoder();
-  }
-
-  getPredictionMethod() {
-    return PredictionSchemeMethod.MESH_PREDICTION_GEOMETRIC_NORMAL;
   }
 
   isInitialized() {
@@ -7470,10 +7440,6 @@ class MeshEdgebreakerTraversalDecoder {
 
   mergeVertices(/* dest, source */) {}
 
-  decodeAttributeSeam(attribute) {
-    return this._attributeConnectivityDecoders[attribute].decodeNextBit() ? true : false;
-  }
-
   done() {
     if (this._symbolBuffer.bitDecoderActive) {
       this._symbolBuffer.endBitDecoding();
@@ -7927,38 +7893,6 @@ class Decoder {
 
   }
 
-  // If the input is a mesh, pointCloud is a Mesh (which extends PointCloud).
-  // Returns { pointCloud, ok, message }.
-  decodePointCloudFromBuffer(inBuffer) {
-
-    const type = Decoder.getEncodedGeometryType(inBuffer);
-
-    if (type === EncodedGeometryType.POINT_CLOUD) {
-
-      const pointCloud = new PointCloud();
-      const status = this.decodeBufferToPointCloud(inBuffer, pointCloud);
-      if (!status.ok) {
-        return { pointCloud: null, ok: false, message: status.message };
-      }
-
-      return { pointCloud, ok: true, message: '' };
-
-    } else if (type === EncodedGeometryType.TRIANGULAR_MESH) {
-
-      const mesh = new Mesh();
-      const status = this.decodeBufferToMesh(inBuffer, mesh);
-      if (!status.ok) {
-        return { pointCloud: null, ok: false, message: status.message };
-      }
-
-      return { pointCloud: mesh, ok: true, message: '' };
-
-    }
-
-    return { pointCloud: null, ok: false, message: 'Unsupported geometry type.' };
-
-  }
-
   // Returns { mesh, ok, message }.
   decodeMeshFromBuffer(inBuffer) {
 
@@ -7969,14 +7903,6 @@ class Decoder {
     }
 
     return { mesh, ok: true, message: '' };
-
-  }
-
-  // Point-cloud decoding is intentionally unimplemented: only triangle meshes
-  // are supported, and PointCloudDecoder exists only as the mesh decoders' base.
-  decodeBufferToPointCloud() {
-
-    return { ok: false, message: 'Point cloud decoding is not supported.' };
 
   }
 
@@ -8161,47 +8087,26 @@ class DRACOLoader extends Loader {
 
 		const geometryType = Decoder.getEncodedGeometryType( decoderBuffer );
 
-		const decoder = new Decoder();
-		let dracoGeometry;
-		let isMesh;
-
-		if ( geometryType === EncodedGeometryType.TRIANGULAR_MESH ) {
-
-			const result = decoder.decodeMeshFromBuffer( decoderBuffer );
-
-			if ( ! result.ok ) {
-
-				throw new Error( 'THREE.DRACOLoader: ' + result.message );
-
-			}
-
-			dracoGeometry = result.mesh;
-			isMesh = true;
-
-		} else if ( geometryType === EncodedGeometryType.POINT_CLOUD ) {
-
-			const result = decoder.decodePointCloudFromBuffer( decoderBuffer );
-
-			if ( ! result.ok ) {
-
-				throw new Error( 'THREE.DRACOLoader: ' + result.message );
-
-			}
-
-			dracoGeometry = result.pointCloud;
-			isMesh = false;
-
-		} else {
+		if ( geometryType !== EncodedGeometryType.TRIANGULAR_MESH ) {
 
 			throw new Error( 'THREE.DRACOLoader: Unexpected geometry type.' );
 
 		}
 
-		return this._buildGeometry( dracoGeometry, isMesh, taskConfig );
+		const decoder = new Decoder();
+		const result = decoder.decodeMeshFromBuffer( decoderBuffer );
+
+		if ( ! result.ok ) {
+
+			throw new Error( 'THREE.DRACOLoader: ' + result.message );
+
+		}
+
+		return this._buildGeometry( result.mesh, taskConfig );
 
 	}
 
-	_buildGeometry( dracoGeometry, isMesh, taskConfig ) {
+	_buildGeometry( dracoGeometry, taskConfig ) {
 
 		const attributeIDs = taskConfig.attributeIDs;
 		const attributeTypes = taskConfig.attributeTypes;
@@ -8252,15 +8157,11 @@ class DRACOLoader extends Loader {
 
 		// Extract face indices.
 
-		if ( isMesh ) {
+		const numFaces = dracoGeometry.numFaces();
+		const index = new Uint32Array( numFaces * 3 );
+		index.set( dracoGeometry.faces_.subarray( 0, numFaces * 3 ) );
 
-			const numFaces = dracoGeometry.numFaces();
-			const index = new Uint32Array( numFaces * 3 );
-			index.set( dracoGeometry.faces_.subarray( 0, numFaces * 3 ) );
-
-			geometry.setIndex( new BufferAttribute( index, 1 ) );
-
-		}
+		geometry.setIndex( new BufferAttribute( index, 1 ) );
 
 		return geometry;
 
