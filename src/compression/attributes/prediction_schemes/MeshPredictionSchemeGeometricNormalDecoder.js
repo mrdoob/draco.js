@@ -1,10 +1,7 @@
 // compression/attributes/prediction_schemes/MeshPredictionSchemeGeometricNormalDecoder.js - ported from compression/attributes/prediction_schemes/mesh_prediction_scheme_geometric_normal_decoder.h
 
 import { MeshPredictionSchemeDecoder } from './MeshPredictionSchemeDecoder.js';
-import {
-  PredictionSchemeMethod,
-  NormalPredictionMode
-} from '../../config/CompressionShared.js';
+import { NormalPredictionMode } from '../../config/CompressionShared.js';
 import { OctahedronToolBox } from '../NormalCompressionUtils.js';
 import { MeshPredictionSchemeGeometricNormalPredictorArea } from './MeshPredictionSchemeGeometricNormalPredictorArea.js';
 import { RAnsBitDecoder } from '../../bit_coders/RAnsBitDecoder.js';
@@ -22,10 +19,6 @@ class MeshPredictionSchemeGeometricNormalDecoder extends MeshPredictionSchemeDec
     this._predictor = new MeshPredictionSchemeGeometricNormalPredictorArea(meshData);
     this._octahedronToolBox = new OctahedronToolBox();
     this._flipNormalBitDecoder = new RAnsBitDecoder();
-  }
-
-  getPredictionMethod() {
-    return PredictionSchemeMethod.MESH_PREDICTION_GEOMETRIC_NORMAL;
   }
 
   isInitialized() {

@@ -1,15 +1,9 @@
 // compression/attributes/prediction_schemes/PredictionSchemeDecoderInterface.js - ported from compression/attributes/prediction_schemes/prediction_scheme_decoder_interface.h
 
-import { PredictionSchemeMethod } from '../../config/CompressionShared.js';
-
 /**
  * Abstract interface for prediction schemes used during attribute decoding.
  */
 class PredictionSchemeDecoderInterface {
-
-  getPredictionMethod() {
-    return PredictionSchemeMethod.PREDICTION_NONE;
-  }
 
   isInitialized() {
     return false;

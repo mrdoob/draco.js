@@ -1,7 +1,6 @@
 // compression/attributes/prediction_schemes/PredictionSchemeDeltaDecoder.js - ported from compression/attributes/prediction_schemes/prediction_scheme_delta_decoder.h
 
 import { PredictionSchemeDecoder } from './PredictionSchemeDecoder.js';
-import { PredictionSchemeMethod } from '../../config/CompressionShared.js';
 
 /**
  * Decoder for delta coding: value[i] = value[i-1] + correction[i].
@@ -10,10 +9,6 @@ class PredictionSchemeDeltaDecoder extends PredictionSchemeDecoder {
 
   constructor(attribute, transform) {
     super(attribute, transform);
-  }
-
-  getPredictionMethod() {
-    return PredictionSchemeMethod.PREDICTION_DIFFERENCE;
   }
 
   isInitialized() {

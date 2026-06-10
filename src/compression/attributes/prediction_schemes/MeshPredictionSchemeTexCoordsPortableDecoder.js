@@ -1,7 +1,6 @@
 // compression/attributes/prediction_schemes/MeshPredictionSchemeTexCoordsPortableDecoder.js - ported from compression/attributes/prediction_schemes/mesh_prediction_scheme_tex_coords_portable_decoder.h
 
 import { MeshPredictionSchemeDecoder } from './MeshPredictionSchemeDecoder.js';
-import { PredictionSchemeMethod } from '../../config/CompressionShared.js';
 import { MeshPredictionSchemeTexCoordsPortablePredictor } from './MeshPredictionSchemeTexCoordsPortablePredictor.js';
 import { RAnsBitDecoder } from '../../bit_coders/RAnsBitDecoder.js';
 
@@ -16,10 +15,6 @@ class MeshPredictionSchemeTexCoordsPortableDecoder extends MeshPredictionSchemeD
   constructor(attribute, transform, meshData) {
     super(attribute, transform, meshData);
     this._predictor = new MeshPredictionSchemeTexCoordsPortablePredictor(meshData);
-  }
-
-  getPredictionMethod() {
-    return PredictionSchemeMethod.MESH_PREDICTION_TEX_COORDS_PORTABLE;
   }
 
   isInitialized() {

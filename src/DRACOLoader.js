@@ -168,47 +168,26 @@ class DRACOLoader extends Loader {
 
 		const geometryType = Decoder.getEncodedGeometryType( decoderBuffer );
 
-		const decoder = new Decoder();
-		let dracoGeometry;
-		let isMesh;
-
-		if ( geometryType === EncodedGeometryType.TRIANGULAR_MESH ) {
-
-			const result = decoder.decodeMeshFromBuffer( decoderBuffer );
-
-			if ( ! result.ok ) {
-
-				throw new Error( 'THREE.DRACOLoader: ' + result.message );
-
-			}
-
-			dracoGeometry = result.mesh;
-			isMesh = true;
-
-		} else if ( geometryType === EncodedGeometryType.POINT_CLOUD ) {
-
-			const result = decoder.decodePointCloudFromBuffer( decoderBuffer );
-
-			if ( ! result.ok ) {
-
-				throw new Error( 'THREE.DRACOLoader: ' + result.message );
-
-			}
-
-			dracoGeometry = result.pointCloud;
-			isMesh = false;
-
-		} else {
+		if ( geometryType !== EncodedGeometryType.TRIANGULAR_MESH ) {
 
 			throw new Error( 'THREE.DRACOLoader: Unexpected geometry type.' );
 
 		}
 
-		return this._buildGeometry( dracoGeometry, isMesh, taskConfig );
+		const decoder = new Decoder();
+		const result = decoder.decodeMeshFromBuffer( decoderBuffer );
+
+		if ( ! result.ok ) {
+
+			throw new Error( 'THREE.DRACOLoader: ' + result.message );
+
+		}
+
+		return this._buildGeometry( result.mesh, taskConfig );
 
 	}
 
-	_buildGeometry( dracoGeometry, isMesh, taskConfig ) {
+	_buildGeometry( dracoGeometry, taskConfig ) {
 
 		const attributeIDs = taskConfig.attributeIDs;
 		const attributeTypes = taskConfig.attributeTypes;
@@ -259,15 +238,11 @@ class DRACOLoader extends Loader {
 
 		// Extract face indices.
 
-		if ( isMesh ) {
+		const numFaces = dracoGeometry.numFaces();
+		const index = new Uint32Array( numFaces * 3 );
+		index.set( dracoGeometry.faces_.subarray( 0, numFaces * 3 ) );
 
-			const numFaces = dracoGeometry.numFaces();
-			const index = new Uint32Array( numFaces * 3 );
-			index.set( dracoGeometry.faces_.subarray( 0, numFaces * 3 ) );
-
-			geometry.setIndex( new BufferAttribute( index, 1 ) );
-
-		}
+		geometry.setIndex( new BufferAttribute( index, 1 ) );
 
 		return geometry;
 

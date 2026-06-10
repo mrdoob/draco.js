@@ -76,10 +76,6 @@ class MeshEdgebreakerTraversalDecoder {
 
   mergeVertices(/* dest, source */) {}
 
-  decodeAttributeSeam(attribute) {
-    return this._attributeConnectivityDecoders[attribute].decodeNextBit() ? true : false;
-  }
-
   done() {
     if (this._symbolBuffer.bitDecoderActive) {
       this._symbolBuffer.endBitDecoding();

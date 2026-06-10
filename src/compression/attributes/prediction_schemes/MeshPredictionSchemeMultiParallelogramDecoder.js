@@ -1,7 +1,6 @@
 // compression/attributes/prediction_schemes/MeshPredictionSchemeMultiParallelogramDecoder.js - ported from compression/attributes/prediction_schemes/mesh_prediction_scheme_multi_parallelogram_decoder.h
 
 import { MeshPredictionSchemeDecoder } from './MeshPredictionSchemeDecoder.js';
-import { PredictionSchemeMethod } from '../../config/CompressionShared.js';
 import { computeParallelogramPrediction } from './MeshPredictionSchemeParallelogramShared.js';
 
 const kInvalidCornerIndex = -1;
@@ -14,10 +13,6 @@ class MeshPredictionSchemeMultiParallelogramDecoder extends MeshPredictionScheme
 
   constructor(attribute, transform, meshData) {
     super(attribute, transform, meshData);
-  }
-
-  getPredictionMethod() {
-    return PredictionSchemeMethod.MESH_PREDICTION_MULTI_PARALLELOGRAM;
   }
 
   isInitialized() {

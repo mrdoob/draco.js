@@ -7,7 +7,6 @@ import {
 } from './config/CompressionShared.js';
 import { DecoderOptions } from './config/DecoderOptions.js';
 import { DecoderBuffer } from '../core/DecoderBuffer.js';
-import { PointCloud } from '../point_cloud/PointCloud.js';
 import { Mesh } from '../mesh/Mesh.js';
 
 import { MeshSequentialDecoder } from './mesh/MeshSequentialDecoder.js';
@@ -71,38 +70,6 @@ class Decoder {
 
   }
 
-  // If the input is a mesh, pointCloud is a Mesh (which extends PointCloud).
-  // Returns { pointCloud, ok, message }.
-  decodePointCloudFromBuffer(inBuffer) {
-
-    const type = Decoder.getEncodedGeometryType(inBuffer);
-
-    if (type === EncodedGeometryType.POINT_CLOUD) {
-
-      const pointCloud = new PointCloud();
-      const status = this.decodeBufferToPointCloud(inBuffer, pointCloud);
-      if (!status.ok) {
-        return { pointCloud: null, ok: false, message: status.message };
-      }
-
-      return { pointCloud, ok: true, message: '' };
-
-    } else if (type === EncodedGeometryType.TRIANGULAR_MESH) {
-
-      const mesh = new Mesh();
-      const status = this.decodeBufferToMesh(inBuffer, mesh);
-      if (!status.ok) {
-        return { pointCloud: null, ok: false, message: status.message };
-      }
-
-      return { pointCloud: mesh, ok: true, message: '' };
-
-    }
-
-    return { pointCloud: null, ok: false, message: 'Unsupported geometry type.' };
-
-  }
-
   // Returns { mesh, ok, message }.
   decodeMeshFromBuffer(inBuffer) {
 
@@ -113,14 +80,6 @@ class Decoder {
     }
 
     return { mesh, ok: true, message: '' };
-
-  }
-
-  // Point-cloud decoding is intentionally unimplemented: only triangle meshes
-  // are supported, and PointCloudDecoder exists only as the mesh decoders' base.
-  decodeBufferToPointCloud() {
-
-    return { ok: false, message: 'Point cloud decoding is not supported.' };
 
   }
 

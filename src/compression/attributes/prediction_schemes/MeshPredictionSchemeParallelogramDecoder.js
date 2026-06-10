@@ -1,10 +1,7 @@
 // compression/attributes/prediction_schemes/MeshPredictionSchemeParallelogramDecoder.js - ported from compression/attributes/prediction_schemes/mesh_prediction_scheme_parallelogram_decoder.h
 
 import { MeshPredictionSchemeDecoder } from './MeshPredictionSchemeDecoder.js';
-import {
-  PredictionSchemeMethod,
-  PredictionSchemeTransformType
-} from '../../config/CompressionShared.js';
+import { PredictionSchemeTransformType } from '../../config/CompressionShared.js';
 
 /**
  * Decoder for the standard parallelogram prediction: the parallelogram formed
@@ -14,10 +11,6 @@ class MeshPredictionSchemeParallelogramDecoder extends MeshPredictionSchemeDecod
 
   constructor(attribute, transform, meshData) {
     super(attribute, transform, meshData);
-  }
-
-  getPredictionMethod() {
-    return PredictionSchemeMethod.MESH_PREDICTION_PARALLELOGRAM;
   }
 
   isInitialized() {

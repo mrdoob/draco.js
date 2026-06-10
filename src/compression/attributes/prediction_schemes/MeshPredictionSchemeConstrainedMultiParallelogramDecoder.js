@@ -1,7 +1,6 @@
 // compression/attributes/prediction_schemes/MeshPredictionSchemeConstrainedMultiParallelogramDecoder.js - ported from compression/attributes/prediction_schemes/mesh_prediction_scheme_constrained_multi_parallelogram_decoder.h
 
 import { MeshPredictionSchemeDecoder } from './MeshPredictionSchemeDecoder.js';
-import { PredictionSchemeMethod } from '../../config/CompressionShared.js';
 import { computeParallelogramPrediction } from './MeshPredictionSchemeParallelogramShared.js';
 import { RAnsBitDecoder } from '../../bit_coders/RAnsBitDecoder.js';
 
@@ -24,10 +23,6 @@ class MeshPredictionSchemeConstrainedMultiParallelogramDecoder extends MeshPredi
     for (let i = 0; i < MAX_NUM_PARALLELOGRAMS; ++i) {
       this._isCreaseEdge.push([]);
     }
-  }
-
-  getPredictionMethod() {
-    return PredictionSchemeMethod.MESH_PREDICTION_CONSTRAINED_MULTI_PARALLELOGRAM;
   }
 
   isInitialized() {
