@@ -173,19 +173,30 @@ export class RAnsDecoder {
     // shrinking the table (up to 4x) keeps that random access closer to cache.
     const LutArray = numSymbols <= 256 ? Uint8Array
       : (numSymbols <= 65536 ? Uint16Array : Uint32Array);
-    this.lutTable = new LutArray(this.ransPrecision);
-    this.probTable = new Uint32Array(numSymbols);
-    this.cumProbTable = new Uint32Array(numSymbols);
+    const lutTable = new LutArray(this.ransPrecision);
+    const probTable = new Uint32Array(numSymbols);
+    const cumProbTable = new Uint32Array(numSymbols);
+    this.lutTable = lutTable;
+    this.probTable = probTable;
+    this.cumProbTable = cumProbTable;
     let cumProb = 0;
     let actProb = 0;
     for (let i = 0; i < numSymbols; ++i) {
-      this.probTable[i] = tokenProbs[i];
-      this.cumProbTable[i] = cumProb;
-      cumProb += tokenProbs[i];
+      const prob = tokenProbs[i];
+      probTable[i] = prob;
+      cumProbTable[i] = cumProb;
+      cumProb += prob;
       if (cumProb > this.ransPrecision) {
         return false;
       }
-      this.lutTable.fill(i, actProb, cumProb);
+      // Manual loop for short runs: fill()'s per-call overhead dominates them.
+      if (prob < 32) {
+        for (let j = actProb; j < cumProb; ++j) {
+          lutTable[j] = i;
+        }
+      } else {
+        lutTable.fill(i, actProb, cumProb);
+      }
       actProb = cumProb;
     }
     if (cumProb !== this.ransPrecision) {
