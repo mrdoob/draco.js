@@ -5909,7 +5909,6 @@ class MeshAttributeCornerTable {
     this.no_interior_seams_ = true;
     this.corner_to_vertex_map_ = [];
     this.vertex_to_left_most_corner_map_ = [];
-    this.vertex_to_attribute_entry_id_map_ = [];
     this.corner_table_ = null;
 
   }
@@ -5925,7 +5924,6 @@ class MeshAttributeCornerTable {
     this.is_edge_on_seam_ = new Uint8Array(table.numCorners());
     this.is_vertex_on_seam_ = new Uint8Array(table.numVertices());
     this.corner_to_vertex_map_ = null;
-    this.vertex_to_attribute_entry_id_map_ = [];
     this.vertex_to_left_most_corner_map_ = [];
     // Lazily built; see oppositeCornerArray.
     this._effectiveOpposite = null;
@@ -6046,8 +6044,6 @@ class MeshAttributeCornerTable {
       }
     }
 
-    // vertex_to_attribute_entry_id_map_ is only read for its length (numVertices()).
-    this.vertex_to_attribute_entry_id_map_ = new Int32Array(numNewVertices);
     // subarray, not copy: exact-length view so accessors see the right length.
     this.vertex_to_left_most_corner_map_ = leftMostMap.subarray(0, numNewVertices);
 
@@ -6098,7 +6094,7 @@ class MeshAttributeCornerTable {
 
   numVertices() {
 
-    return this.vertex_to_attribute_entry_id_map_.length;
+    return this.vertex_to_left_most_corner_map_.length;
 
   }
 
@@ -6194,7 +6190,6 @@ class MeshAttributeCornerTable {
 
   adoptVertexRecompute(other) {
     this.corner_to_vertex_map_ = other.corner_to_vertex_map_;
-    this.vertex_to_attribute_entry_id_map_ = other.vertex_to_attribute_entry_id_map_;
     this.vertex_to_left_most_corner_map_ = other.vertex_to_left_most_corner_map_;
     this.no_interior_seams_ = other.no_interior_seams_;
     this._effectiveOpposite = other._effectiveOpposite;
