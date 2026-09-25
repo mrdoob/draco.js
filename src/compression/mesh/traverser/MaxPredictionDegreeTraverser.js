@@ -57,6 +57,7 @@ class MaxPredictionDegreeTraverser {
   }
 
   onTraversalStart() {
+    this._observer.onTraversalStart();
     // Cache hits never start a traversal, so they do not need visited flags,
     // priority buckets or prediction-degree storage.
     const cornerTable = this._cornerTable;

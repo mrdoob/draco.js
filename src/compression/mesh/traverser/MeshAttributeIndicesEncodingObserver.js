@@ -7,9 +7,13 @@ class MeshAttributeIndicesEncodingObserver {
   constructor(mesh, sequencer, encodingData) {
     this._encodingData = encodingData;
     this._sequencer = sequencer;
-    this._vertexToEncodedMap = encodingData.vertexToEncodedAttributeValueIndexMap;
-    this._encodedToCornerMap = encodingData.encodedAttributeValueIndexToCornerMap;
     this._faces = mesh.faces_;
+  }
+
+  onTraversalStart() {
+    this._encodingData.allocate();
+    this._vertexToEncodedMap = this._encodingData.vertexToEncodedAttributeValueIndexMap;
+    this._encodedToCornerMap = this._encodingData.encodedAttributeValueIndexToCornerMap;
   }
 
   onNewVertexVisited(vertex, corner) {

@@ -39,6 +39,7 @@ class DepthFirstTraverser {
   }
 
   onTraversalStart() {
+    this._observer.onTraversalStart();
     // The sequencer calls this only after a traversal-cache miss. Allocate
     // scratch storage here so attributes reusing a traversal need none of it.
     const cornerTable = this._cornerTable;

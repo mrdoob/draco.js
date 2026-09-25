@@ -951,11 +951,15 @@ class MeshAttributeIndicesEncodingData {
   }
 
   init(numVertices) {
-    // Int32Array (non-negative data indices) keeps the hot prediction-lookup
-    // reads monomorphic.
-    this._vertexToEncodedAttributeValueIndexMap = new Int32Array(numVertices);
-    this._encodedAttributeValueIndexToCornerMap = new Int32Array(numVertices);
+    this._numVertices = numVertices;
     this._numValues = 0;
+  }
+
+  allocate() {
+    // Int32Array (non-negative data indices) keeps the hot prediction-lookup
+    // reads monomorphic. A cached traversal adopts its maps without allocating.
+    this._vertexToEncodedAttributeValueIndexMap = new Int32Array(this._numVertices);
+    this._encodedAttributeValueIndexToCornerMap = new Int32Array(this._numVertices);
   }
 
   // Adopts a traversal result from an identical corner table, avoiding a

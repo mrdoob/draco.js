@@ -4458,6 +4458,7 @@ class DepthFirstTraverser {
   }
 
   onTraversalStart() {
+    this._observer.onTraversalStart();
     // The sequencer calls this only after a traversal-cache miss. Allocate
     // scratch storage here so attributes reusing a traversal need none of it.
     const cornerTable = this._cornerTable;
@@ -4642,6 +4643,7 @@ class MaxPredictionDegreeTraverser {
   }
 
   onTraversalStart() {
+    this._observer.onTraversalStart();
     // Cache hits never start a traversal, so they do not need visited flags,
     // priority buckets or prediction-degree storage.
     const cornerTable = this._cornerTable;
@@ -4926,9 +4928,13 @@ class MeshAttributeIndicesEncodingObserver {
   constructor(mesh, sequencer, encodingData) {
     this._encodingData = encodingData;
     this._sequencer = sequencer;
-    this._vertexToEncodedMap = encodingData.vertexToEncodedAttributeValueIndexMap;
-    this._encodedToCornerMap = encodingData.encodedAttributeValueIndexToCornerMap;
     this._faces = mesh.faces_;
+  }
+
+  onTraversalStart() {
+    this._encodingData.allocate();
+    this._vertexToEncodedMap = this._encodingData.vertexToEncodedAttributeValueIndexMap;
+    this._encodedToCornerMap = this._encodingData.encodedAttributeValueIndexToCornerMap;
   }
 
   onNewVertexVisited(vertex, corner) {
@@ -6205,11 +6211,15 @@ class MeshAttributeIndicesEncodingData {
   }
 
   init(numVertices) {
-    // Int32Array (non-negative data indices) keeps the hot prediction-lookup
-    // reads monomorphic.
-    this._vertexToEncodedAttributeValueIndexMap = new Int32Array(numVertices);
-    this._encodedAttributeValueIndexToCornerMap = new Int32Array(numVertices);
+    this._numVertices = numVertices;
     this._numValues = 0;
+  }
+
+  allocate() {
+    // Int32Array (non-negative data indices) keeps the hot prediction-lookup
+    // reads monomorphic. A cached traversal adopts its maps without allocating.
+    this._vertexToEncodedAttributeValueIndexMap = new Int32Array(this._numVertices);
+    this._encodedAttributeValueIndexToCornerMap = new Int32Array(this._numVertices);
   }
 
   // Adopts a traversal result from an identical corner table, avoiding a
