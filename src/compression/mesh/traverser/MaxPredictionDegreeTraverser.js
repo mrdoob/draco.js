@@ -38,12 +38,9 @@ class MaxPredictionDegreeTraverser {
   init(cornerTable, observer) {
     this._cornerTable = cornerTable;
     this._observer = observer;
-    this._isFaceVisited = new Uint8Array(cornerTable.numFaces());
-    this._isVertexVisited = new Uint8Array(cornerTable.numVertices());
     this._numVisitedFaces = 0;
     this._cornerToVertex = cornerTable.cornerToVertexArray();
     this._oppositeCorners = cornerTable.oppositeCornerArray();
-    this._traversalStacks = [[], [], []]; // kMaxPriority buckets
     this._bestPriority = 0;
   }
 
@@ -60,7 +57,15 @@ class MaxPredictionDegreeTraverser {
   }
 
   onTraversalStart() {
-    this._predictionDegree = new Int32Array(this._cornerTable.numVertices());
+    // Cache hits never start a traversal, so they do not need visited flags,
+    // priority buckets or prediction-degree storage.
+    const cornerTable = this._cornerTable;
+    this._isFaceVisited = new Uint8Array(cornerTable.numFaces());
+    this._isVertexVisited = new Uint8Array(cornerTable.numVertices());
+    this._traversalStacks = [[], [], []]; // kMaxPriority buckets
+    this._predictionDegree = new Int32Array(cornerTable.numVertices());
+    this._numVisitedFaces = 0;
+    this._bestPriority = 0;
   }
 
   onTraversalEnd() {}
