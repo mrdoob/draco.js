@@ -37,14 +37,14 @@ class SequentialNormalAttributeDecoder extends SequentialIntegerAttributeDecoder
 
   decodeDataNeededByPortableTransform(pointIds, buffer) {
     return this._octahedralTransform.decodeParameters(
-      this.getPortableAttribute(), buffer
+      this.attribute, buffer
     );
   }
 
-  _storeValues(numPoints) {
-    return this._octahedralTransform.inverseTransformAttribute(
-      this.getPortableAttribute(), this.attribute
-    );
+  finalizeAttribute() {
+    if (!this._octahedralTransform.init()) return false;
+    this.attribute.transform = this._octahedralTransform;
+    return true;
   }
 
   createIntPredictionScheme(method, transformType) {

@@ -1,5 +1,7 @@
 // compression/attributes/SequentialAttributeDecoder.js - ported from compression/attributes/sequential_attribute_decoder.h/cc
 
+import { AttributeArrays } from '../../attributes/PointAttribute.js';
+import { dataTypeLength } from '../../core/DracoTypes.js';
 
 // A base class for decoding attribute values encoded by the
 // SequentialAttributeEncoder.
@@ -9,8 +11,6 @@ class SequentialAttributeDecoder {
     this._decoder = null;
     this._attribute = null;
     this._attributeId = -1;
-    // Decoded portable attribute (after lossless decoding).
-    this._portableAttribute = null;
   }
 
   init(decoder, attributeId) {
@@ -24,9 +24,7 @@ class SequentialAttributeDecoder {
     if (this._attribute.numComponents <= 0) {
       return false;
     }
-    if (!this._attribute.reset(pointIds.length)) {
-      return false;
-    }
+    this._attribute.size = pointIds.length;
     return this.decodeValues(pointIds, buffer);
   }
 
@@ -36,27 +34,12 @@ class SequentialAttributeDecoder {
   }
 
   // No-op by default; subclasses with a transform override this.
-  transformAttributeToOriginalFormat(pointIds) {
+  finalizeAttribute(pointIds) {
     return true;
   }
 
   getPortableAttribute() {
-    // Copy point->value index mapping from the final attribute to the portable
-    // one. Both maps are Uint32Array, so copy in one shot instead of per-entry
-    // mappedIndex()/setPointMapEntry() calls.
-    if (!this._attribute.isMappingIdentity && this._portableAttribute &&
-        this._portableAttribute.isMappingIdentity) {
-      const size = this._attribute.indicesMapSize;
-      this._portableAttribute.setExplicitMapping(size);
-      const src = this._attribute.indicesMap;
-      const dst = this._portableAttribute.indicesMap;
-      if (src.length === size) {
-        dst.set(src);
-      } else {
-        dst.set(src.subarray(0, size));
-      }
-    }
-    return this._portableAttribute;
+    return this._attribute.portable ? this._attribute : null;
   }
 
   get attribute() {
@@ -90,25 +73,22 @@ class SequentialAttributeDecoder {
   // Decodes raw attribute values in their original format.
   decodeValues(pointIds, buffer) {
     const numValues = pointIds.length;
-    const entrySize = this._attribute.byteStride;
+    const attribute = this._attribute;
+    const entrySize = dataTypeLength(attribute.dataType) * attribute.numComponents;
+    const ArrayType = AttributeArrays[attribute.dataType];
+    attribute.values = ArrayType ? new ArrayType(numValues * attribute.numComponents)
+      : new Uint8Array(numValues * entrySize);
+    const bytes = new Uint8Array(attribute.values.buffer);
     let outBytePos = 0;
     for (let i = 0; i < numValues; i++) {
       const valueData = buffer.decodeBytes(entrySize);
       if (valueData === undefined) {
         return false;
       }
-      this._attribute.buffer.write(outBytePos, valueData, entrySize);
+      bytes.set(valueData, outBytePos);
       outBytePos += entrySize;
     }
     return true;
-  }
-
-  setPortableAttribute(att) {
-    this._portableAttribute = att;
-  }
-
-  get portableAttribute() {
-    return this._portableAttribute;
   }
 
 }

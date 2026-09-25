@@ -1,8 +1,6 @@
 // compression/attributes/SequentialIntegerAttributeDecoder.js - ported from compression/attributes/sequential_integer_attribute_decoder.h/cc
 
 import { SequentialAttributeDecoder } from './SequentialAttributeDecoder.js';
-import { GeometryAttribute } from '../../attributes/GeometryAttribute.js';
-import { PointAttribute } from '../../attributes/PointAttribute.js';
 import { DataType, dataTypeLength } from '../../core/DracoTypes.js';
 import { convertSymbolsToSignedInts } from '../../core/BitUtils.js';
 import { PredictionSchemeMethod, PredictionSchemeTransformType } from '../config/CompressionShared.js';
@@ -18,8 +16,9 @@ class SequentialIntegerAttributeDecoder extends SequentialAttributeDecoder {
     this._predictionScheme = null;
   }
 
-  transformAttributeToOriginalFormat(pointIds) {
-    return this._storeValues(pointIds.length);
+  finalizeAttribute() {
+    // Keep the former store-time validation even for unrequested attributes.
+    return this.attribute.dataType >= DataType.INT8 && this.attribute.dataType <= DataType.UINT32;
   }
 
   decodeValues(pointIds, buffer) {
@@ -148,69 +147,14 @@ class SequentialIntegerAttributeDecoder extends SequentialAttributeDecoder {
     return this.attribute.numComponents;
   }
 
-  // Stores decoded integer values into the attribute.
-  _storeValues(numValues) {
-    const dt = this.attribute.dataType;
-    switch (dt) {
-      case DataType.UINT8:
-        this._storeTypedValues(numValues, Uint8Array);
-        break;
-      case DataType.INT8:
-        this._storeTypedValues(numValues, Int8Array);
-        break;
-      case DataType.UINT16:
-        this._storeTypedValues(numValues, Uint16Array);
-        break;
-      case DataType.INT16:
-        this._storeTypedValues(numValues, Int16Array);
-        break;
-      case DataType.UINT32:
-        this._storeTypedValues(numValues, Uint32Array);
-        break;
-      case DataType.INT32:
-        this._storeTypedValues(numValues, Int32Array);
-        break;
-      default:
-        return false;
-    }
-    return true;
-  }
-
-  _storeTypedValues(numValues, TypedArrayClass) {
-    const numComponents = this.attribute.numComponents;
-    const total = numValues * numComponents;
-    if (total === 0) {
-      return;
-    }
-    const src = this.getPortableAttributeData(); // Int32Array of the decoded values.
-    // TypedArray.set coerces per element to the target type -- same result as the
-    // per-entry byte copy, without per-value buffer.write() dispatch. dstAddr has
-    // byteOffset 0, so the typed view is aligned.
-    const dstAddr = this.attribute.getAddress(0);
-    const dst = new TypedArrayClass(dstAddr.buffer, dstAddr.byteOffset, total);
-    dst.set(src);
-  }
-
   preparePortableAttribute(numEntries, numComponents) {
-    const ga = new GeometryAttribute();
-    ga.init(
-      this.attribute.attributeType, null, numComponents, DataType.INT32,
-      false, numComponents * dataTypeLength(DataType.INT32), 0
-    );
-    const portAtt = new PointAttribute(ga);
-    portAtt.setIdentityMapping();
-    portAtt.reset(numEntries);
-    portAtt.uniqueId = this.attribute.uniqueId;
-    this.setPortableAttribute(portAtt);
+    this.attribute.portable = true;
+    this.attribute.portableComponents = numComponents;
+    this.attribute.values = new Int32Array(numEntries * numComponents);
   }
 
   getPortableAttributeData() {
-    if (this.portableAttribute.size === 0) {
-      return null;
-    }
-    const addr = this.portableAttribute.getAddress(0);
-    return new Int32Array(addr.buffer, addr.byteOffset,
-      this.portableAttribute.size * this.portableAttribute.numComponents);
+    return this.attribute.size === 0 ? null : this.attribute.values;
   }
 
 }

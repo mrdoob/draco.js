@@ -1405,393 +1405,108 @@ function dataTypeLength(dt) {
   }
 }
 
-// attributes/GeometryAttribute.js - ported from attributes/geometry_attribute.h/cc
-
-
-const Type = {
-  INVALID: -1,
-  NAMED_ATTRIBUTES_COUNT: 5
-};
-
-class GeometryAttribute {
-
-  constructor() {
-    this._buffer = null;
-    this._numComponents = 1;
-    this._dataType = DataType.FLOAT32;
-    this._normalized = false;
-    this._byteStride = 0;
-    this._byteOffset = 0;
-    this._attributeType = Type.INVALID;
-    this._uniqueId = 0;
-  }
-
-  init(attributeType, buffer, numComponents, dataType, normalized, byteStride, byteOffset) {
-    this._buffer = buffer;
-    this._numComponents = numComponents;
-    this._dataType = dataType;
-    this._normalized = normalized;
-    this._byteStride = byteStride;
-    this._byteOffset = byteOffset;
-    this._attributeType = attributeType;
-  }
-
-  // Returns a Uint8Array view of the buffer starting at the attribute entry.
-  getAddress(attIndex) {
-    const bytePos = this._byteOffset + this._byteStride * attIndex;
-    return this._buffer.data.subarray(bytePos);
-  }
-
-  resetBuffer(buffer, byteStride, byteOffset) {
-    this._buffer = buffer;
-    this._byteStride = byteStride;
-    this._byteOffset = byteOffset;
-  }
-
-  get attributeType() { return this._attributeType; }
-
-  get dataType() { return this._dataType; }
-
-  get numComponents() { return this._numComponents; }
-
-  get buffer() { return this._buffer; }
-
-  get byteStride() { return this._byteStride; }
-
-  get byteOffset() { return this._byteOffset; }
-
-  get uniqueId() { return this._uniqueId; }
-  set uniqueId(id) { this._uniqueId = id; }
-
-}
-
-// core/DataBuffer.js - ported from data_buffer.h/cc
-
-class DataBuffer {
-
-  constructor() {
-    this._data = new Uint8Array(0);
-  }
-
-  resize(newSize) {
-    if (newSize < 0) return false;
-    if (newSize === this._data.length) return true;
-    const newData = new Uint8Array(newSize);
-    newData.set(this._data.subarray(0, Math.min(this._data.length, newSize)));
-    this._data = newData;
-    return true;
-  }
-
-  write(bytePos, inArray, dataSize) {
-    // Fast path: the common caller passes a Uint8Array of exactly dataSize bytes.
-    // Avoid allocating a wrapper view per value (dominates storage time / GC pressure).
-    if (inArray instanceof Uint8Array) {
-      this._data.set(inArray.length === dataSize ? inArray : inArray.subarray(0, dataSize), bytePos);
-      return;
-    }
-    const src = new Uint8Array(inArray.buffer || inArray, inArray.byteOffset || 0, dataSize);
-    this._data.set(src, bytePos);
-  }
-
-  get data() { return this._data; }
-}
-
 // attributes/GeometryIndices.js - ported from attributes/geometry_indices.h
 
 // Invalid-index sentinel; matches C++ std::numeric_limits<uint32_t>::max().
 const kInvalidAttributeValueIndex = 0xFFFFFFFF >>> 0;
 
-// attributes/PointAttribute.js - ported from attributes/point_attribute.h/cc
+// Decoder-owned attribute record. Values stay in encoded entry order; the
+// original type and optional transform are applied only to requested output.
 
+const AttributeArrays = {
+  1: Int8Array, 2: Uint8Array, 3: Int16Array, 4: Uint16Array,
+  5: Int32Array, 6: Uint32Array, 9: Float32Array, 10: Float64Array,
+};
 
-class PointAttribute extends GeometryAttribute {
-
-  constructor(geometryAttribute) {
-    super();
-    this._identityMapping = false;
-    this._numUniqueEntries = 0;
-    this._indicesMap = [];
-    this._attributeBuffer = null;
-
-    if (geometryAttribute instanceof GeometryAttribute) {
-      this._buffer = geometryAttribute._buffer;
-      this._numComponents = geometryAttribute._numComponents;
-      this._dataType = geometryAttribute._dataType;
-      this._normalized = geometryAttribute._normalized;
-      this._byteStride = geometryAttribute._byteStride;
-      this._byteOffset = geometryAttribute._byteOffset;
-      this._attributeType = geometryAttribute._attributeType;
-      this._uniqueId = geometryAttribute._uniqueId;
-    }
+class PointAttribute {
+  constructor(attributeType, dataType, numComponents, normalized) {
+    this.attributeType = attributeType;
+    this.dataType = dataType;
+    this.numComponents = numComponents;
+    this.normalized = normalized;
+    this.uniqueId = 0;
+    this.size = 0;
+    this.values = null;
+    this.portable = false;
+    this.portableComponents = numComponents;
+    this.transform = null;
+    this.indicesMap = null;
   }
 
-  reset(numAttributeValues) {
-    if (this._attributeBuffer === null) {
-      this._attributeBuffer = new DataBuffer();
-    }
-    const entrySize = dataTypeLength(this.dataType) * this.numComponents;
-    this._attributeBuffer.resize(numAttributeValues * entrySize);
-    this.resetBuffer(this._attributeBuffer, entrySize, 0);
-    this._numUniqueEntries = numAttributeValues;
-    return true;
-  }
+  get isMappingIdentity() { return this.indicesMap === null; }
 
-  get size() {
-    return this._numUniqueEntries;
-  }
-
-  mappedIndex(pointIndex) {
-    if (this._identityMapping) {
-      return pointIndex;
-    }
-    return this._indicesMap[pointIndex];
-  }
-
-  get isMappingIdentity() {
-    return this._identityMapping;
-  }
-
-  get indicesMapSize() {
-    if (this._identityMapping) {
-      return 0;
-    }
-    return this._indicesMap.length;
-  }
-
-  // Direct access to the explicit point->value index map (Uint32Array after
-  // setExplicitMapping). Lets hot mapping loops write entries without a
-  // per-entry setPointMapEntry() dispatch.
-  get indicesMap() {
-    return this._indicesMap;
-  }
-
-  // Implicit mapping: point index equals attribute entry index.
-  setIdentityMapping() {
-    this._identityMapping = true;
-    this._indicesMap = [];
-  }
+  setIdentityMapping() { this.indicesMap = null; }
 
   setExplicitMapping(numPoints) {
-    this._identityMapping = false;
-    // Uint32Array (rather than a plain Array) keeps mappedIndex() monomorphic
-    // and avoids boxed-number storage; it is read once per point per attribute.
-    // Must be UNSIGNED so the 0xFFFFFFFF invalid sentinel round-trips intact.
-    this._indicesMap = new Uint32Array(numPoints);
-    this._indicesMap.fill(kInvalidAttributeValueIndex);
+    this.indicesMap = new Uint32Array(numPoints);
+    this.indicesMap.fill(kInvalidAttributeValueIndex);
   }
 
-  // Mirrors C++ PointAttribute::ConvertValue<T>().
-  convertValue(attIndex, outVal) {
-    const bytePos = this._byteOffset + this._byteStride * attIndex;
-    const bufData = this._buffer.data;
-    const dt = this._dataType;
-    const nc = this._numComponents;
-
-    if (dt === DataType.FLOAT32) {
-      if (this._cachedFloat32View === undefined || this._cachedFloat32Buffer !== bufData.buffer) {
-        this._cachedFloat32Buffer = bufData.buffer;
-        this._cachedFloat32View = new Float32Array(bufData.buffer);
-      }
-      const baseIndex = (bufData.byteOffset + bytePos) >> 2;
-      for (let i = 0; i < nc; ++i) {
-        outVal[i] = this._cachedFloat32View[baseIndex + i];
-      }
-      return;
+  extractTo(OutputTypedArray, numPoints, map = this.indicesMap) {
+    const nc = this.numComponents;
+    const output = new OutputTypedArray(numPoints * nc);
+    const values = this.values;
+    if (values === null || numPoints === 0) return output;
+    if (this.transform !== null) {
+      this.transform.extractTo(values, map, output, nc);
+      return output;
     }
 
-    // INT32 fast path: portable attrs are INT32, read per-corner by the
-    // geometric-normal / texcoords predictors. Cached Int32Array view avoids
-    // the per-component DataView dispatch (base is always 4-aligned).
-    if (dt === DataType.INT32) {
-      if (this._cachedInt32View === undefined || this._cachedInt32Buffer !== bufData.buffer) {
-        this._cachedInt32Buffer = bufData.buffer;
-        this._cachedInt32View = new Int32Array(bufData.buffer);
+    // Raw INT64/UINT64/BOOL conversion was unsupported by the old scalar
+    // accessor and yielded zero. Keep that behavior while consuming its bytes.
+    if (!AttributeArrays[this.dataType]) return output;
+
+    if (this.portable) {
+      // Reconstruct the ORIGINAL integer width/sign before converting to the
+      // requested array. Portable Int32 values are also used by later predictors
+      // and must not be narrowed or overwritten in place.
+      const shift = 32 - dataTypeLength(this.dataType) * 8;
+      const unsigned = this.dataType % 2 === 0;
+      for (let p = 0, d = 0; p < numPoints; p++) {
+        const s = (map === null ? p : map[p]) * nc;
+        for (let c = 0; c < nc; c++, d++) {
+          const value = values[s + c];
+          output[d] = value === undefined ? value
+            : unsigned ? (value << shift) >>> shift : (value << shift) >> shift;
+        }
       }
-      const baseIndex = (bufData.byteOffset + bytePos) >> 2;
-      for (let i = 0; i < nc; ++i) {
-        outVal[i] = this._cachedInt32View[baseIndex + i];
-      }
-      return;
+      return output;
     }
 
-    if (dt === DataType.UINT32) {
-      if (this._cachedUint32View === undefined || this._cachedUint32Buffer !== bufData.buffer) {
-        this._cachedUint32Buffer = bufData.buffer;
-        this._cachedUint32View = new Uint32Array(bufData.buffer);
+    if (map === null) {
+      output.set(values.subarray(0, output.length));
+    } else if (nc === 3) {
+      for (let p = 0, d = 0; p < numPoints; p++, d += 3) {
+        const s = map[p] * 3;
+        output[d] = values[s]; output[d + 1] = values[s + 1]; output[d + 2] = values[s + 2];
       }
-      const baseIndex = (bufData.byteOffset + bytePos) >> 2;
-      for (let i = 0; i < nc; ++i) {
-        outVal[i] = this._cachedUint32View[baseIndex + i];
+    } else if (nc === 2) {
+      for (let p = 0, d = 0; p < numPoints; p++, d += 2) {
+        const s = map[p] * 2;
+        output[d] = values[s]; output[d + 1] = values[s + 1];
       }
-      return;
-    }
-
-    // General path: cached DataView for non-32-bit-aligned types.
-    if (this._cachedDataView === undefined || this._cachedDVBuffer !== bufData.buffer) {
-      this._cachedDVBuffer = bufData.buffer;
-      this._cachedDataView = new DataView(bufData.buffer, bufData.byteOffset, bufData.byteLength);
-    }
-    const dv = this._cachedDataView;
-    for (let i = 0; i < nc; ++i) {
-      switch (dt) {
-        case DataType.INT8:
-          outVal[i] = dv.getInt8(bytePos + i); break;
-        case DataType.UINT8:
-          outVal[i] = dv.getUint8(bytePos + i); break;
-        case DataType.INT16:
-          outVal[i] = dv.getInt16(bytePos + i * 2, true); break;
-        case DataType.UINT16:
-          outVal[i] = dv.getUint16(bytePos + i * 2, true); break;
-        case DataType.FLOAT64:
-          outVal[i] = dv.getFloat64(bytePos + i * 8, true); break;
-        default:
-          outVal[i] = 0; break;
+    } else {
+      for (let p = 0, d = 0; p < numPoints; p++) {
+        const s = map[p] * nc;
+        for (let c = 0; c < nc; c++) output[d++] = values[s + c];
       }
     }
+    return output;
   }
+}
 
-  // Flat-array extraction of all values into one output typed array (avoids the
-  // per-point temp-array copy via cached typed-array views over the buffer).
-  extractTo(OutputTypedArray, numPoints) {
-    const numComponents = this._numComponents;
-    const array = new OutputTypedArray(numPoints * numComponents);
-    if (this._buffer == null || this._buffer.data == null || numPoints === 0) {
-      return array;
-    }
-    const bufData = this._buffer.data;
-    const dt = this._dataType;
-    const isIdentity = this._identityMapping;
-    const indicesMap = this._indicesMap;
-    const byteStride = this._byteStride;
-    const byteOffset = this._byteOffset;
-
-    let srcView = null;
-    let shift = 0;
-
-    if (dt === DataType.FLOAT32) {
-      if (this._cachedFloat32View === undefined || this._cachedFloat32Buffer !== bufData.buffer) {
-        this._cachedFloat32Buffer = bufData.buffer;
-        this._cachedFloat32View = new Float32Array(bufData.buffer);
-      }
-      srcView = this._cachedFloat32View;
-      shift = 2;
-    } else if (dt === DataType.INT32) {
-      if (this._cachedInt32View === undefined || this._cachedInt32Buffer !== bufData.buffer) {
-        this._cachedInt32Buffer = bufData.buffer;
-        this._cachedInt32View = new Int32Array(bufData.buffer);
-      }
-      srcView = this._cachedInt32View;
-      shift = 2;
-    } else if (dt === DataType.UINT32) {
-      if (this._cachedUint32View === undefined || this._cachedUint32Buffer !== bufData.buffer) {
-        this._cachedUint32Buffer = bufData.buffer;
-        this._cachedUint32View = new Uint32Array(bufData.buffer);
-      }
-      srcView = this._cachedUint32View;
-      shift = 2;
-    } else if (dt === DataType.UINT16) {
-      if (this._cachedUint16View === undefined || this._cachedUint16Buffer !== bufData.buffer) {
-        this._cachedUint16Buffer = bufData.buffer;
-        this._cachedUint16View = new Uint16Array(bufData.buffer);
-      }
-      srcView = this._cachedUint16View;
-      shift = 1;
-    } else if (dt === DataType.INT16) {
-      if (this._cachedInt16View === undefined || this._cachedInt16Buffer !== bufData.buffer) {
-        this._cachedInt16Buffer = bufData.buffer;
-        this._cachedInt16View = new Int16Array(bufData.buffer);
-      }
-      srcView = this._cachedInt16View;
-      shift = 1;
-    } else if (dt === DataType.UINT8) {
-      if (this._cachedUint8View === undefined || this._cachedUint8Buffer !== bufData.buffer) {
-        this._cachedUint8Buffer = bufData.buffer;
-        this._cachedUint8View = new Uint8Array(bufData.buffer);
-      }
-      srcView = this._cachedUint8View;
-      shift = 0;
-    } else if (dt === DataType.INT8) {
-      if (this._cachedInt8View === undefined || this._cachedInt8Buffer !== bufData.buffer) {
-        this._cachedInt8Buffer = bufData.buffer;
-        this._cachedInt8View = new Int8Array(bufData.buffer);
-      }
-      srcView = this._cachedInt8View;
-      shift = 0;
-    } else if (dt === DataType.FLOAT64) {
-      if (this._cachedFloat64View === undefined || this._cachedFloat64Buffer !== bufData.buffer) {
-        this._cachedFloat64Buffer = bufData.buffer;
-        this._cachedFloat64View = new Float64Array(bufData.buffer);
-      }
-      srcView = this._cachedFloat64View;
-      shift = 3;
-    }
-
-    if (srcView !== null) {
-      const srcStart = (bufData.byteOffset + byteOffset) >> shift;
-      const strideElements = byteStride >> shift;
-
-      // Contiguous: single block copy when source and output types match.
-      if (isIdentity && strideElements === numComponents) {
-        const srcEnd = srcStart + numPoints * numComponents;
-        if (srcView.constructor === OutputTypedArray) {
-          array.set(srcView.subarray(srcStart, srcEnd));
-          return array;
-        }
-      }
-
-      // Branch the loop-invariant isIdentity once; unroll the nc=2/3 gather.
-      if (isIdentity) {
-        let dst = 0;
-        for (let i = 0; i < numPoints; i++) {
-          const srcOffset = srcStart + i * strideElements;
-          for (let j = 0; j < numComponents; j++) {
-            array[dst + j] = srcView[srcOffset + j];
-          }
-          dst += numComponents;
-        }
-      } else if (numComponents === 3) {
-        let dst = 0;
-        for (let i = 0; i < numPoints; i++) {
-          const srcOffset = srcStart + indicesMap[i] * strideElements;
-          array[dst] = srcView[srcOffset];
-          array[dst + 1] = srcView[srcOffset + 1];
-          array[dst + 2] = srcView[srcOffset + 2];
-          dst += 3;
-        }
-      } else if (numComponents === 2) {
-        let dst = 0;
-        for (let i = 0; i < numPoints; i++) {
-          const srcOffset = srcStart + indicesMap[i] * strideElements;
-          array[dst] = srcView[srcOffset];
-          array[dst + 1] = srcView[srcOffset + 1];
-          dst += 2;
-        }
-      } else {
-        let dst = 0;
-        for (let i = 0; i < numPoints; i++) {
-          const srcOffset = srcStart + indicesMap[i] * strideElements;
-          for (let j = 0; j < numComponents; j++) {
-            array[dst + j] = srcView[srcOffset + j];
-          }
-          dst += numComponents;
-        }
-      }
-      return array;
-    }
-
-    // Fallback for any other dtype via convertValue.
-    const temp = new Array(numComponents);
-    for (let i = 0; i < numPoints; i++) {
-      const attIndex = isIdentity ? i : indicesMap[i];
-      this.convertValue(attIndex, temp);
-      const dstOffset = i * numComponents;
-      for (let j = 0; j < numComponents; j++) {
-        array[dstOffset + j] = temp[j];
-      }
-    }
-    return array;
+// Prediction parents are the same records, read in portable integer form.
+// The parent map is immutable after sequencing; no second map or buffer exists.
+function buildInt32PositionCache(attribute, pointIds, numEntries) {
+  const values = attribute.values;
+  const map = attribute.indicesMap;
+  const cache = new Int32Array(numEntries * 3);
+  for (let i = 0, d = 0; i < numEntries; i++, d += 3) {
+    const point = pointIds[i];
+    const s = (map === null ? point : map[point]) * 3;
+    cache[d] = values[s]; cache[d + 1] = values[s + 1]; cache[d + 2] = values[s + 2];
   }
-
+  return cache;
 }
 
 // compression/attributes/AttributesDecoder.js - ported from compression/attributes/attributes_decoder.h/cc
@@ -1844,7 +1559,7 @@ class AttributesDecoder {
       const normalized = buffer.decodeUint8();
       if (normalized === undefined) return false;
 
-      if (attType >= Type.NAMED_ATTRIBUTES_COUNT) {
+      if (attType >= 5) {
         return false;
       }
       if (dataType === DataType.INVALID || dataType >= DataType.TYPES_COUNT) {
@@ -1855,18 +1570,9 @@ class AttributesDecoder {
         return false;
       }
 
-      const ga = new GeometryAttribute();
-      ga.init(
-        attType, null, numComponents, dataType,
-        normalized > 0,
-        dataTypeLength(dataType) * numComponents, 0
-      );
-
       const uniqueId = decodeVarint(buffer, false);
       if (uniqueId === undefined) return false;
-      ga.uniqueId = uniqueId;
-
-      const pa = new PointAttribute(ga);
+      const pa = new PointAttribute(attType, dataType, numComponents, normalized > 0);
       const attId = pc.addAttribute(pa);
       pc.attribute(attId).uniqueId = uniqueId;
       this._pointAttributeIds[i] = attId;
@@ -1902,7 +1608,7 @@ class AttributesDecoder {
     if (!this.decodeDataNeededByPortableTransforms(buffer)) {
       return false;
     }
-    if (!this.transformAttributesToOriginalFormat()) {
+    if (!this.finalizeAttributes()) {
       return false;
     }
     return true;
@@ -1928,8 +1634,6 @@ class SequentialAttributeDecoder {
     this._decoder = null;
     this._attribute = null;
     this._attributeId = -1;
-    // Decoded portable attribute (after lossless decoding).
-    this._portableAttribute = null;
   }
 
   init(decoder, attributeId) {
@@ -1943,9 +1647,7 @@ class SequentialAttributeDecoder {
     if (this._attribute.numComponents <= 0) {
       return false;
     }
-    if (!this._attribute.reset(pointIds.length)) {
-      return false;
-    }
+    this._attribute.size = pointIds.length;
     return this.decodeValues(pointIds, buffer);
   }
 
@@ -1955,27 +1657,12 @@ class SequentialAttributeDecoder {
   }
 
   // No-op by default; subclasses with a transform override this.
-  transformAttributeToOriginalFormat(pointIds) {
+  finalizeAttribute(pointIds) {
     return true;
   }
 
   getPortableAttribute() {
-    // Copy point->value index mapping from the final attribute to the portable
-    // one. Both maps are Uint32Array, so copy in one shot instead of per-entry
-    // mappedIndex()/setPointMapEntry() calls.
-    if (!this._attribute.isMappingIdentity && this._portableAttribute &&
-        this._portableAttribute.isMappingIdentity) {
-      const size = this._attribute.indicesMapSize;
-      this._portableAttribute.setExplicitMapping(size);
-      const src = this._attribute.indicesMap;
-      const dst = this._portableAttribute.indicesMap;
-      if (src.length === size) {
-        dst.set(src);
-      } else {
-        dst.set(src.subarray(0, size));
-      }
-    }
-    return this._portableAttribute;
+    return this._attribute.portable ? this._attribute : null;
   }
 
   get attribute() {
@@ -2009,25 +1696,22 @@ class SequentialAttributeDecoder {
   // Decodes raw attribute values in their original format.
   decodeValues(pointIds, buffer) {
     const numValues = pointIds.length;
-    const entrySize = this._attribute.byteStride;
+    const attribute = this._attribute;
+    const entrySize = dataTypeLength(attribute.dataType) * attribute.numComponents;
+    const ArrayType = AttributeArrays[attribute.dataType];
+    attribute.values = ArrayType ? new ArrayType(numValues * attribute.numComponents)
+      : new Uint8Array(numValues * entrySize);
+    const bytes = new Uint8Array(attribute.values.buffer);
     let outBytePos = 0;
     for (let i = 0; i < numValues; i++) {
       const valueData = buffer.decodeBytes(entrySize);
       if (valueData === undefined) {
         return false;
       }
-      this._attribute.buffer.write(outBytePos, valueData, entrySize);
+      bytes.set(valueData, outBytePos);
       outBytePos += entrySize;
     }
     return true;
-  }
-
-  setPortableAttribute(att) {
-    this._portableAttribute = att;
-  }
-
-  get portableAttribute() {
-    return this._portableAttribute;
   }
 
 }
@@ -2857,47 +2541,6 @@ function bigIntSqrt(value) {
   return x;
 }
 
-// Precompute every entry's integer position into a flat Int32Array (the JS-port
-// form of the C++ predictor's per-call GetPositionForEntryId()).
-function buildInt32PositionCache$1(att, map, numEntries, tempPos) {
-  const cache = new Int32Array(numEntries * 3);
-  const bufData = att.buffer && att.buffer.data;
-
-  if (att.dataType === DataType.INT32 && att.numComponents === 3 && bufData) {
-    const src = new Int32Array(bufData.buffer);
-    const srcStart = (bufData.byteOffset + att.byteOffset) >> 2;
-    const stride = att.byteStride >> 2;
-    const isIdentity = att.isMappingIdentity;
-    const indicesMap = att.indicesMap;
-    if (isIdentity) {
-      for (let d = 0; d < numEntries; ++d) {
-        const srcOffset = srcStart + map[d] * stride;
-        const o = d * 3;
-        cache[o] = src[srcOffset];
-        cache[o + 1] = src[srcOffset + 1];
-        cache[o + 2] = src[srcOffset + 2];
-      }
-    } else {
-      for (let d = 0; d < numEntries; ++d) {
-        const srcOffset = srcStart + indicesMap[map[d]] * stride;
-        const o = d * 3;
-        cache[o] = src[srcOffset];
-        cache[o + 1] = src[srcOffset + 1];
-        cache[o + 2] = src[srcOffset + 2];
-      }
-    }
-  } else {
-    for (let d = 0; d < numEntries; ++d) {
-      att.convertValue(att.mappedIndex(map[d]), tempPos);
-      const o = d * 3;
-      cache[o] = tempPos[0];
-      cache[o + 1] = tempPos[1];
-      cache[o + 2] = tempPos[2];
-    }
-  }
-  return cache;
-}
-
 /**
  * Predictor functionality used for portable UV prediction by both encoder and
  * decoder. This implements only the decoder path (is_encoder_t = false).
@@ -2913,7 +2556,6 @@ class MeshPredictionSchemeTexCoordsPortablePredictor {
     this._orientations = new Uint8Array(0);
     this._numOrientations = 0;
     this._meshData = meshData;
-    this._tempPos = new Array(3);
     // Flat Int32 position cache so fetches are array reads, not convertValue calls.
     this._posCache = null;
     this._cornerToVertex = null;
@@ -2941,8 +2583,8 @@ class MeshPredictionSchemeTexCoordsPortablePredictor {
   }
 
   buildPositionCache(numEntries) {
-    this._posCache = buildInt32PositionCache$1(
-      this._posAttribute, this._entryToPointIdMap, numEntries, this._tempPos);
+    this._posCache = buildInt32PositionCache(
+      this._posAttribute, this._entryToPointIdMap, numEntries);
     this._cornerToVertex = this._meshData.cornerTable.cornerToVertexArray();
   }
 
@@ -3186,7 +2828,7 @@ class MeshPredictionSchemeTexCoordsPortableDecoder extends MeshPredictionSchemeD
 
   setParentAttribute(att) {
     if (!att || att.attributeType !== GEOMETRY_ATTRIBUTE_POSITION$1) return false;
-    if (att.numComponents !== 3) return false;
+    if (att.portableComponents !== 3) return false;
     this._predictor.setPositionAttribute(att);
     return true;
   }
@@ -3324,18 +2966,18 @@ class OctahedronToolBox {
     }
   }
 
-  quantizedOctahedralCoordsToUnitVector(inS, inT, outVector) {
+  quantizedOctahedralCoordsToUnitVector(inS, inT, outVector, offset = 0) {
     // float32 throughout (Math.fround) to stay bit-identical to the WASM
     // decoder, matching the live copy in AttributeOctahedronTransform.js.
     const fround = Math.fround;
     this._octahedralCoordsToUnitVector(
       fround(fround(fround(inS) * this._dequantizationScale) - 1.0),
       fround(fround(fround(inT) * this._dequantizationScale) - 1.0),
-      outVector
+      outVector, offset
     );
   }
 
-  _octahedralCoordsToUnitVector(inSScaled, inTScaled, outVector) {
+  _octahedralCoordsToUnitVector(inSScaled, inTScaled, outVector, offset) {
     // float32 throughout (see quantizedOctahedralCoordsToUnitVector) so normals
     // are bit-identical to WASM.
     const fround = Math.fround;
@@ -3351,14 +2993,14 @@ class OctahedronToolBox {
 
     const normSquared = fround(fround(fround(x * x) + fround(y * y)) + fround(z * z));
     if (normSquared < 1e-6) {
-      outVector[0] = 0;
-      outVector[1] = 0;
-      outVector[2] = 0;
+      outVector[offset + 0] = 0;
+      outVector[offset + 1] = 0;
+      outVector[offset + 2] = 0;
     } else {
       const d = fround(1.0 / fround(Math.sqrt(normSquared)));
-      outVector[0] = fround(x * d);
-      outVector[1] = fround(y * d);
-      outVector[2] = fround(z * d);
+      outVector[offset + 0] = fround(x * d);
+      outVector[offset + 1] = fround(y * d);
+      outVector[offset + 2] = fround(z * d);
     }
   }
 
@@ -3370,47 +3012,6 @@ class OctahedronToolBox {
 
 const UPPER_BOUND = 1 << 29;
 
-// Precompute every entry's integer position into a flat Int32Array (the JS-port
-// form of the C++ predictor's per-call GetPositionForDataId()).
-function buildInt32PositionCache(att, map, numEntries, tempPos) {
-  const cache = new Int32Array(numEntries * 3);
-  const bufData = att.buffer && att.buffer.data;
-
-  if (att.dataType === DataType.INT32 && att.numComponents === 3 && bufData) {
-    const src = new Int32Array(bufData.buffer);
-    const srcStart = (bufData.byteOffset + att.byteOffset) >> 2;
-    const stride = att.byteStride >> 2;
-    const isIdentity = att.isMappingIdentity;
-    const indicesMap = att.indicesMap;
-    if (isIdentity) {
-      for (let d = 0; d < numEntries; ++d) {
-        const srcOffset = srcStart + map[d] * stride;
-        const o = d * 3;
-        cache[o] = src[srcOffset];
-        cache[o + 1] = src[srcOffset + 1];
-        cache[o + 2] = src[srcOffset + 2];
-      }
-    } else {
-      for (let d = 0; d < numEntries; ++d) {
-        const srcOffset = srcStart + indicesMap[map[d]] * stride;
-        const o = d * 3;
-        cache[o] = src[srcOffset];
-        cache[o + 1] = src[srcOffset + 1];
-        cache[o + 2] = src[srcOffset + 2];
-      }
-    }
-  } else {
-    for (let d = 0; d < numEntries; ++d) {
-      att.convertValue(att.mappedIndex(map[d]), tempPos);
-      const o = d * 3;
-      cache[o] = tempPos[0];
-      cache[o + 1] = tempPos[1];
-      cache[o + 2] = tempPos[2];
-    }
-  }
-  return cache;
-}
-
 /**
  * Predictor that estimates the normal via the surrounding triangles of a
  * given corner, weighted by triangle area.
@@ -3421,7 +3022,6 @@ class MeshPredictionSchemeGeometricNormalPredictorArea {
     this._posAttribute = null;
     this._entryToPointIdMap = null;
     this._meshData = meshData;
-    this._tempPos = new Array(3);
     this._posCache = null;            // flat Int32 positions, indexed by data id
     this._cornerToVertex = null;
     this._oppositeCorners = null;
@@ -3438,7 +3038,7 @@ class MeshPredictionSchemeGeometricNormalPredictorArea {
 
   buildPositionCache(numEntries) {
     this._posCache = buildInt32PositionCache(
-      this._posAttribute, this._entryToPointIdMap, numEntries, this._tempPos);
+      this._posAttribute, this._entryToPointIdMap, numEntries);
     const table = this._meshData.cornerTable;
     this._cornerToVertex = table.cornerToVertexArray();
     this._oppositeCorners = table.oppositeCornerArray();
@@ -3579,7 +3179,7 @@ class MeshPredictionSchemeGeometricNormalDecoder extends MeshPredictionSchemeDec
 
   setParentAttribute(att) {
     if (att.attributeType !== GEOMETRY_ATTRIBUTE_POSITION) return false;
-    if (att.numComponents !== 3) return false;
+    if (att.portableComponents !== 3) return false;
     this._predictor.setPositionAttribute(att);
     return true;
   }
@@ -3838,8 +3438,9 @@ class SequentialIntegerAttributeDecoder extends SequentialAttributeDecoder {
     this._predictionScheme = null;
   }
 
-  transformAttributeToOriginalFormat(pointIds) {
-    return this._storeValues(pointIds.length);
+  finalizeAttribute() {
+    // Keep the former store-time validation even for unrequested attributes.
+    return this.attribute.dataType >= DataType.INT8 && this.attribute.dataType <= DataType.UINT32;
   }
 
   decodeValues(pointIds, buffer) {
@@ -3968,69 +3569,14 @@ class SequentialIntegerAttributeDecoder extends SequentialAttributeDecoder {
     return this.attribute.numComponents;
   }
 
-  // Stores decoded integer values into the attribute.
-  _storeValues(numValues) {
-    const dt = this.attribute.dataType;
-    switch (dt) {
-      case DataType.UINT8:
-        this._storeTypedValues(numValues, Uint8Array);
-        break;
-      case DataType.INT8:
-        this._storeTypedValues(numValues, Int8Array);
-        break;
-      case DataType.UINT16:
-        this._storeTypedValues(numValues, Uint16Array);
-        break;
-      case DataType.INT16:
-        this._storeTypedValues(numValues, Int16Array);
-        break;
-      case DataType.UINT32:
-        this._storeTypedValues(numValues, Uint32Array);
-        break;
-      case DataType.INT32:
-        this._storeTypedValues(numValues, Int32Array);
-        break;
-      default:
-        return false;
-    }
-    return true;
-  }
-
-  _storeTypedValues(numValues, TypedArrayClass) {
-    const numComponents = this.attribute.numComponents;
-    const total = numValues * numComponents;
-    if (total === 0) {
-      return;
-    }
-    const src = this.getPortableAttributeData(); // Int32Array of the decoded values.
-    // TypedArray.set coerces per element to the target type -- same result as the
-    // per-entry byte copy, without per-value buffer.write() dispatch. dstAddr has
-    // byteOffset 0, so the typed view is aligned.
-    const dstAddr = this.attribute.getAddress(0);
-    const dst = new TypedArrayClass(dstAddr.buffer, dstAddr.byteOffset, total);
-    dst.set(src);
-  }
-
   preparePortableAttribute(numEntries, numComponents) {
-    const ga = new GeometryAttribute();
-    ga.init(
-      this.attribute.attributeType, null, numComponents, DataType.INT32,
-      false, numComponents * dataTypeLength(DataType.INT32), 0
-    );
-    const portAtt = new PointAttribute(ga);
-    portAtt.setIdentityMapping();
-    portAtt.reset(numEntries);
-    portAtt.uniqueId = this.attribute.uniqueId;
-    this.setPortableAttribute(portAtt);
+    this.attribute.portable = true;
+    this.attribute.portableComponents = numComponents;
+    this.attribute.values = new Int32Array(numEntries * numComponents);
   }
 
   getPortableAttributeData() {
-    if (this.portableAttribute.size === 0) {
-      return null;
-    }
-    const addr = this.portableAttribute.getAddress(0);
-    return new Int32Array(addr.buffer, addr.byteOffset,
-      this.portableAttribute.size * this.portableAttribute.numComponents);
+    return this.attribute.size === 0 ? null : this.attribute.values;
   }
 
 }
@@ -4092,66 +3638,44 @@ class AttributeQuantizationTransform {
     return true;
   }
 
-  inverseTransformAttribute(attribute, targetAttribute) {
-    if (targetAttribute.dataType !== DataType.FLOAT32) {
-      return false;
-    }
-
+  init() {
     const maxQuantizedValue = ((1 << this._quantizationBits) >>> 0) - 1;
-    const numComponents = targetAttribute.numComponents;
     const dequantizer = new Dequantizer();
-    if (!dequantizer.initFromRange(this._range, maxQuantizedValue)) {
-      return false;
-    }
-
-    const numValues = targetAttribute.size;
-    const total = numValues * numComponents;
-    const delta = dequantizer.delta;
-    const minValues = this._minValues;
-
-    // The portable (source) attribute holds native-endian int32; the target
-    // holds float32. Attribute buffers start at byteOffset 0, so typed-array
-    // views are aligned -- read/write through them directly to avoid a
-    // per-component DataView dispatch and a per-entry buffer copy.
-    const srcAddr = attribute.getAddress(0);
-    const srcI32 = new Int32Array(srcAddr.buffer, srcAddr.byteOffset, total);
-    const dstAddr = targetAttribute.getAddress(0);
-    const dstF32 = new Float32Array(dstAddr.buffer, dstAddr.byteOffset, total);
-
-    // Mirror Draco C++ float32 arithmetic so the result is bit-identical to the
-    // WASM decoder: `value` (int) is converted to float, multiplied by the
-    // float `delta` (both rounded to float32), then added to the float32 min.
-    // The Float32Array store performs the final round of the addition.
-    const fround = Math.fround;
-
-    // Specialize nc=3/2 (positions/texcoords) with minValues hoisted to locals;
-    // same operands/order as the generic path below, so bit-identical.
-    if (numComponents === 3) {
-      const m0 = minValues[0], m1 = minValues[1], m2 = minValues[2];
-      for (let o = 0; o < total; o += 3) {
-        dstF32[o] = fround(fround(srcI32[o]) * delta) + m0;
-        dstF32[o + 1] = fround(fround(srcI32[o + 1]) * delta) + m1;
-        dstF32[o + 2] = fround(fround(srcI32[o + 2]) * delta) + m2;
-      }
-      return true;
-    }
-    if (numComponents === 2) {
-      const m0 = minValues[0], m1 = minValues[1];
-      for (let o = 0; o < total; o += 2) {
-        dstF32[o] = fround(fround(srcI32[o]) * delta) + m0;
-        dstF32[o + 1] = fround(fround(srcI32[o + 1]) * delta) + m1;
-      }
-      return true;
-    }
-
-    let o = 0;
-    for (let i = 0; i < numValues; i++) {
-      for (let c = 0; c < numComponents; c++) {
-        dstF32[o] = fround(fround(srcI32[o]) * delta) + minValues[c];
-        o++;
-      }
-    }
+    if (!dequantizer.initFromRange(this._range, maxQuantizedValue)) return false;
+    this._delta = dequantizer.delta;
     return true;
+  }
+
+  extractTo(values, map, output, nc) {
+    const count = output.length / nc;
+    const delta = this._delta;
+    const min = this._minValues;
+    const fround = Math.fround;
+    // The original attribute was FLOAT32 even when the caller requests integer
+    // output: round the final addition BEFORE the destination's conversion.
+    if (nc === 3) {
+      const m0 = min[0], m1 = min[1], m2 = min[2];
+      for (let p = 0, d = 0; p < count; p++, d += 3) {
+        const s = (map === null ? p : map[p]) * 3;
+        output[d] = fround(fround(fround(values[s]) * delta) + m0);
+        output[d + 1] = fround(fround(fround(values[s + 1]) * delta) + m1);
+        output[d + 2] = fround(fround(fround(values[s + 2]) * delta) + m2);
+      }
+    } else if (nc === 2) {
+      const m0 = min[0], m1 = min[1];
+      for (let p = 0, d = 0; p < count; p++, d += 2) {
+        const s = (map === null ? p : map[p]) * 2;
+        output[d] = fround(fround(fround(values[s]) * delta) + m0);
+        output[d + 1] = fround(fround(fround(values[s + 1]) * delta) + m1);
+      }
+    } else {
+      for (let p = 0, d = 0; p < count; p++) {
+        const s = (map === null ? p : map[p]) * nc;
+        for (let c = 0; c < nc; c++) {
+          output[d++] = fround(fround(fround(values[s + c]) * delta) + min[c]);
+        }
+      }
+    }
   }
 
   static _isQuantizationValid(quantizationBits) {
@@ -4185,27 +3709,13 @@ class SequentialQuantizationAttributeDecoder extends SequentialIntegerAttributeD
   }
 
   decodeDataNeededByPortableTransform(pointIds, buffer) {
-    return this._decodeQuantizedDataInfo();
+    return this._quantizationTransform.decodeParameters(this.attribute, buffer);
   }
 
-  // Override: dequantize the values instead of a generic integer store.
-  _storeValues(numPoints) {
-    return this._dequantizeValues(numPoints);
-  }
-
-  _decodeQuantizedDataInfo() {
-    let att = this.getPortableAttribute();
-    if (att === null) {
-      // Null only in backward-compatibility mode; fall back to the raw attribute.
-      att = this.attribute;
-    }
-    return this._quantizationTransform.decodeParameters(att, this.decoder.buffer());
-  }
-
-  _dequantizeValues(numValues) {
-    return this._quantizationTransform.inverseTransformAttribute(
-      this.getPortableAttribute(), this.attribute
-    );
+  finalizeAttribute() {
+    if (!this._quantizationTransform.init()) return false;
+    this.attribute.transform = this._quantizationTransform;
+    return true;
   }
 
 }
@@ -4226,43 +3736,19 @@ class AttributeOctahedronTransform {
     return true;
   }
 
-  inverseTransformAttribute(attribute, targetAttribute) {
-    if (targetAttribute.dataType !== DataType.FLOAT32) {
-      return false;
-    }
+  init() {
+    this._toolBox = new OctahedronToolBox();
+    return this._toolBox.setQuantizationBits(this._quantizationBits);
+  }
 
-    const numPoints = targetAttribute.size;
-    const numComponents = targetAttribute.numComponents;
-    if (numComponents !== 3) {
-      return false;
+  extractTo(values, map, output) {
+    const count = output.length / 3;
+    for (let p = 0, d = 0; p < count; p++, d += 3) {
+      const s = (map === null ? p : map[p]) * 2;
+      // The toolbox explicitly rounds every result to FLOAT32, including when
+      // output is an integer array. No intermediate normal vector is needed.
+      this._toolBox.quantizedOctahedralCoordsToUnitVector(values[s], values[s + 1], output, d);
     }
-
-    const toolBox = new OctahedronToolBox();
-    if (!toolBox.setQuantizationBits(this._quantizationBits)) {
-      return false;
-    }
-
-    // Source holds native-endian int32 octahedral coords (2 per point); target
-    // holds float32 unit vectors (3 per point). Attribute buffers start at
-    // byteOffset 0, so typed-array views are aligned -- read/write directly,
-    // avoiding a per-point DataView dispatch and per-entry buffer copy.
-    const srcAddr = attribute.getAddress(0);
-    const srcI32 = new Int32Array(srcAddr.buffer, srcAddr.byteOffset, numPoints * 2);
-    const dstAddr = targetAttribute.getAddress(0);
-    const dstF32 = new Float32Array(dstAddr.buffer, dstAddr.byteOffset, numPoints * 3);
-
-    const outVec = this._tmpVec || (this._tmpVec = new Float32Array(3));
-    let si = 0;
-    let di = 0;
-    for (let i = 0; i < numPoints; i++) {
-      toolBox.quantizedOctahedralCoordsToUnitVector(srcI32[si], srcI32[si + 1], outVec);
-      si += 2;
-      dstF32[di] = outVec[0];
-      dstF32[di + 1] = outVec[1];
-      dstF32[di + 2] = outVec[2];
-      di += 3;
-    }
-    return true;
   }
 
 }
@@ -4585,14 +4071,14 @@ class SequentialNormalAttributeDecoder extends SequentialIntegerAttributeDecoder
 
   decodeDataNeededByPortableTransform(pointIds, buffer) {
     return this._octahedralTransform.decodeParameters(
-      this.getPortableAttribute(), buffer
+      this.attribute, buffer
     );
   }
 
-  _storeValues(numPoints) {
-    return this._octahedralTransform.inverseTransformAttribute(
-      this.getPortableAttribute(), this.attribute
-    );
+  finalizeAttribute() {
+    if (!this._octahedralTransform.init()) return false;
+    this.attribute.transform = this._octahedralTransform;
+    return true;
   }
 
   createIntPredictionScheme(method, transformType) {
@@ -4700,10 +4186,10 @@ class SequentialAttributeDecodersController extends AttributesDecoder {
     return true;
   }
 
-  transformAttributesToOriginalFormat() {
+  finalizeAttributes() {
     const numAttributes = this.getNumAttributes();
     for (let i = 0; i < numAttributes; i++) {
-      if (!this._sequentialDecoders[i].transformAttributeToOriginalFormat(
+      if (!this._sequentialDecoders[i].finalizeAttribute(
             this._pointIds)) {
         return false;
       }

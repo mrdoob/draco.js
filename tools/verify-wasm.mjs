@@ -164,16 +164,17 @@ function compare(module, decoder, js, wasm) {
       }
       const wf = new module.DracoFloat32Array();
       decoder.GetAttributeFloatForAllPoints(wasm.geom, wattr, wf);
-      const tmp = new Array(nc);
+      // Deferred source attributes materialize through the same typed-array
+      // boundary as DRACOLoader. Float64 preserves the old scalar comparison's
+      // original values without introducing an extra Float32 conversion.
+      const values = jAttr.extractTo(Float64Array, wPts);
       let mism = 0;       // diffs above FLOAT_EPS (real divergence)
       let exact = 0;      // any non-zero diff (incl. float rounding)
       let firstMism = null;
       let attrMaxDiff = 0;
       for (let i = 0; i < wPts; i++) {
-        const ai = jAttr.mappedIndex(i);
-        jAttr.convertValue(ai, tmp);
         for (let c = 0; c < nc; c++) {
-          const jv = tmp[c];
+          const jv = values[i * nc + c];
           const wv = wf.GetValue(i * nc + c);
           const d = Math.abs(jv - wv);
           if (d > attrMaxDiff) attrMaxDiff = d;

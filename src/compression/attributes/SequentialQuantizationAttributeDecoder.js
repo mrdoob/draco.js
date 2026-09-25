@@ -26,27 +26,13 @@ class SequentialQuantizationAttributeDecoder extends SequentialIntegerAttributeD
   }
 
   decodeDataNeededByPortableTransform(pointIds, buffer) {
-    return this._decodeQuantizedDataInfo();
+    return this._quantizationTransform.decodeParameters(this.attribute, buffer);
   }
 
-  // Override: dequantize the values instead of a generic integer store.
-  _storeValues(numPoints) {
-    return this._dequantizeValues(numPoints);
-  }
-
-  _decodeQuantizedDataInfo() {
-    let att = this.getPortableAttribute();
-    if (att === null) {
-      // Null only in backward-compatibility mode; fall back to the raw attribute.
-      att = this.attribute;
-    }
-    return this._quantizationTransform.decodeParameters(att, this.decoder.buffer());
-  }
-
-  _dequantizeValues(numValues) {
-    return this._quantizationTransform.inverseTransformAttribute(
-      this.getPortableAttribute(), this.attribute
-    );
+  finalizeAttribute() {
+    if (!this._quantizationTransform.init()) return false;
+    this.attribute.transform = this._quantizationTransform;
+    return true;
   }
 
 }

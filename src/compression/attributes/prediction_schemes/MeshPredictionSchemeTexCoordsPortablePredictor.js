@@ -1,6 +1,6 @@
 // compression/attributes/prediction_schemes/MeshPredictionSchemeTexCoordsPortablePredictor.js - ported from compression/attributes/prediction_schemes/mesh_prediction_scheme_tex_coords_portable_predictor.h
 
-import { DataType } from '../../../core/DracoTypes.js';
+import { buildInt32PositionCache } from '../../../attributes/PointAttribute.js';
 
 // 2^53: integer products below this are exact as a JS double; at or above it
 // the double path may lose precision and we switch to the BigInt path.
@@ -21,47 +21,6 @@ function bigIntSqrt(value) {
   return x;
 }
 
-// Precompute every entry's integer position into a flat Int32Array (the JS-port
-// form of the C++ predictor's per-call GetPositionForEntryId()).
-function buildInt32PositionCache(att, map, numEntries, tempPos) {
-  const cache = new Int32Array(numEntries * 3);
-  const bufData = att.buffer && att.buffer.data;
-
-  if (att.dataType === DataType.INT32 && att.numComponents === 3 && bufData) {
-    const src = new Int32Array(bufData.buffer);
-    const srcStart = (bufData.byteOffset + att.byteOffset) >> 2;
-    const stride = att.byteStride >> 2;
-    const isIdentity = att.isMappingIdentity;
-    const indicesMap = att.indicesMap;
-    if (isIdentity) {
-      for (let d = 0; d < numEntries; ++d) {
-        const srcOffset = srcStart + map[d] * stride;
-        const o = d * 3;
-        cache[o] = src[srcOffset];
-        cache[o + 1] = src[srcOffset + 1];
-        cache[o + 2] = src[srcOffset + 2];
-      }
-    } else {
-      for (let d = 0; d < numEntries; ++d) {
-        const srcOffset = srcStart + indicesMap[map[d]] * stride;
-        const o = d * 3;
-        cache[o] = src[srcOffset];
-        cache[o + 1] = src[srcOffset + 1];
-        cache[o + 2] = src[srcOffset + 2];
-      }
-    }
-  } else {
-    for (let d = 0; d < numEntries; ++d) {
-      att.convertValue(att.mappedIndex(map[d]), tempPos);
-      const o = d * 3;
-      cache[o] = tempPos[0];
-      cache[o + 1] = tempPos[1];
-      cache[o + 2] = tempPos[2];
-    }
-  }
-  return cache;
-}
-
 /**
  * Predictor functionality used for portable UV prediction by both encoder and
  * decoder. This implements only the decoder path (is_encoder_t = false).
@@ -77,7 +36,6 @@ class MeshPredictionSchemeTexCoordsPortablePredictor {
     this._orientations = new Uint8Array(0);
     this._numOrientations = 0;
     this._meshData = meshData;
-    this._tempPos = new Array(3);
     // Flat Int32 position cache so fetches are array reads, not convertValue calls.
     this._posCache = null;
     this._cornerToVertex = null;
@@ -106,7 +64,7 @@ class MeshPredictionSchemeTexCoordsPortablePredictor {
 
   buildPositionCache(numEntries) {
     this._posCache = buildInt32PositionCache(
-      this._posAttribute, this._entryToPointIdMap, numEntries, this._tempPos);
+      this._posAttribute, this._entryToPointIdMap, numEntries);
     this._cornerToVertex = this._meshData.cornerTable.cornerToVertexArray();
   }
 

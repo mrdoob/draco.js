@@ -88,10 +88,10 @@ class SequentialAttributeDecodersController extends AttributesDecoder {
     return true;
   }
 
-  transformAttributesToOriginalFormat() {
+  finalizeAttributes() {
     const numAttributes = this.getNumAttributes();
     for (let i = 0; i < numAttributes; i++) {
-      if (!this._sequentialDecoders[i].transformAttributeToOriginalFormat(
+      if (!this._sequentialDecoders[i].finalizeAttribute(
             this._pointIds)) {
         return false;
       }

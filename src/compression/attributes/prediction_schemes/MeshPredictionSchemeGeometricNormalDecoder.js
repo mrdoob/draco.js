@@ -30,7 +30,7 @@ class MeshPredictionSchemeGeometricNormalDecoder extends MeshPredictionSchemeDec
 
   setParentAttribute(att) {
     if (att.attributeType !== GEOMETRY_ATTRIBUTE_POSITION) return false;
-    if (att.numComponents !== 3) return false;
+    if (att.portableComponents !== 3) return false;
     this._predictor.setPositionAttribute(att);
     return true;
   }

@@ -22,6 +22,7 @@ import { fileURLToPath } from 'url';
 import { performance } from 'perf_hooks';
 import { DecoderBuffer } from '../src/core/DecoderBuffer.js';
 import { Decoder } from '../src/compression/Decode.js';
+import { AttributeArrays } from '../src/attributes/PointAttribute.js';
 import { EncodedGeometryType } from '../src/compression/config/CompressionShared.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -88,6 +89,19 @@ function readSample(name) {
 
 // Decode one buffer into a Mesh/PointCloud. The encoded input is only read, so
 // the same Uint8Array can be reused across iterations with a fresh buffer view.
+// The source decoder now retains portable records. Include original-value
+// materialization in this historical core-decode benchmark so deferred work is
+// not silently excluded. Public loader benchmarks additionally include mapping
+// to point order and requested output types.
+function materialize(geom) {
+  geom._materializedAttributes = [];
+  for (let i = 0; i < geom.numAttributes(); i++) {
+    const att = geom.attribute(i);
+    geom._materializedAttributes.push(att.extractTo(AttributeArrays[att.dataType] || Float64Array, att.size, null));
+  }
+  return geom;
+}
+
 function decode(u8) {
   const db = new DecoderBuffer();
   db.init(u8, u8.length);
@@ -96,11 +110,11 @@ function decode(u8) {
   if (type === EncodedGeometryType.TRIANGULAR_MESH) {
     const r = decoder.decodeMeshFromBuffer(db);
     if (!r.ok) throw new Error(r.message);
-    return { geom: r.mesh, isMesh: true };
+    return { geom: materialize(r.mesh), isMesh: true };
   }
   const r = decoder.decodePointCloudFromBuffer(db);
   if (!r.ok) throw new Error(r.message);
-  return { geom: r.pointCloud, isMesh: false };
+  return { geom: materialize(r.pointCloud), isMesh: false };
 }
 
 // Decode one buffer with the draco3d WASM reference, then free the WASM-side
@@ -145,21 +159,14 @@ function hashGeometry(geom, isMesh) {
   for (let a = 0; a < numAttributes; a++) {
     const att = geom.attribute(a);
     const nc = att ? att.numComponents : 0;
-    const hasBuf = att && att._buffer != null;
+    const hasBuf = att && att.values !== null;
     // Hash structural metadata always (so a present->absent change is caught),
     // then the per-point values when the attribute is actually backed by data.
     h.update(Buffer.from(Int32Array.from([
       att ? att.uniqueId : -1, att ? att.attributeType : -1, nc, hasBuf ? 1 : 0,
     ]).buffer));
     if (!hasBuf) continue;
-    const vals = new Float64Array(numPoints * nc);
-    const tmp = new Array(nc);
-    for (let i = 0; i < numPoints; i++) {
-      const ai = att.mappedIndex(i);
-      att.convertValue(ai, tmp);
-      const o = i * nc;
-      for (let c = 0; c < nc; c++) vals[o + c] = tmp[c];
-    }
+    const vals = att.extractTo(Float64Array, numPoints);
     h.update(Buffer.from(vals.buffer));
   }
   return h.digest('hex');

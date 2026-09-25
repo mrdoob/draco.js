@@ -85,18 +85,18 @@ class OctahedronToolBox {
     }
   }
 
-  quantizedOctahedralCoordsToUnitVector(inS, inT, outVector) {
+  quantizedOctahedralCoordsToUnitVector(inS, inT, outVector, offset = 0) {
     // float32 throughout (Math.fround) to stay bit-identical to the WASM
     // decoder, matching the live copy in AttributeOctahedronTransform.js.
     const fround = Math.fround;
     this._octahedralCoordsToUnitVector(
       fround(fround(fround(inS) * this._dequantizationScale) - 1.0),
       fround(fround(fround(inT) * this._dequantizationScale) - 1.0),
-      outVector
+      outVector, offset
     );
   }
 
-  _octahedralCoordsToUnitVector(inSScaled, inTScaled, outVector) {
+  _octahedralCoordsToUnitVector(inSScaled, inTScaled, outVector, offset) {
     // float32 throughout (see quantizedOctahedralCoordsToUnitVector) so normals
     // are bit-identical to WASM.
     const fround = Math.fround;
@@ -112,14 +112,14 @@ class OctahedronToolBox {
 
     const normSquared = fround(fround(fround(x * x) + fround(y * y)) + fround(z * z));
     if (normSquared < 1e-6) {
-      outVector[0] = 0;
-      outVector[1] = 0;
-      outVector[2] = 0;
+      outVector[offset + 0] = 0;
+      outVector[offset + 1] = 0;
+      outVector[offset + 2] = 0;
     } else {
       const d = fround(1.0 / fround(Math.sqrt(normSquared)));
-      outVector[0] = fround(x * d);
-      outVector[1] = fround(y * d);
-      outVector[2] = fround(z * d);
+      outVector[offset + 0] = fround(x * d);
+      outVector[offset + 1] = fround(y * d);
+      outVector[offset + 2] = fround(z * d);
     }
   }
 

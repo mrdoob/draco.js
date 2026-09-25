@@ -1,8 +1,7 @@
 // compression/attributes/AttributesDecoder.js - ported from compression/attributes/attributes_decoder.h/cc
 
-import { GeometryAttribute, GeometryAttributeType } from '../../attributes/GeometryAttribute.js';
 import { PointAttribute } from '../../attributes/PointAttribute.js';
-import { DataType, dataTypeLength } from '../../core/DracoTypes.js';
+import { DataType } from '../../core/DracoTypes.js';
 import { decodeVarint } from '../../core/VarintDecoding.js';
 
 // Base class for AttributesDecoders; shared functionality for all of them.
@@ -52,7 +51,7 @@ class AttributesDecoder {
       const normalized = buffer.decodeUint8();
       if (normalized === undefined) return false;
 
-      if (attType >= GeometryAttributeType.NAMED_ATTRIBUTES_COUNT) {
+      if (attType >= 5) {
         return false;
       }
       if (dataType === DataType.INVALID || dataType >= DataType.TYPES_COUNT) {
@@ -63,18 +62,9 @@ class AttributesDecoder {
         return false;
       }
 
-      const ga = new GeometryAttribute();
-      ga.init(
-        attType, null, numComponents, dataType,
-        normalized > 0,
-        dataTypeLength(dataType) * numComponents, 0
-      );
-
       const uniqueId = decodeVarint(buffer, false);
       if (uniqueId === undefined) return false;
-      ga.uniqueId = uniqueId;
-
-      const pa = new PointAttribute(ga);
+      const pa = new PointAttribute(attType, dataType, numComponents, normalized > 0);
       const attId = pc.addAttribute(pa);
       pc.attribute(attId).uniqueId = uniqueId;
       this._pointAttributeIds[i] = attId;
@@ -110,7 +100,7 @@ class AttributesDecoder {
     if (!this.decodeDataNeededByPortableTransforms(buffer)) {
       return false;
     }
-    if (!this.transformAttributesToOriginalFormat()) {
+    if (!this.finalizeAttributes()) {
       return false;
     }
     return true;
