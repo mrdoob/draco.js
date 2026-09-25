@@ -778,7 +778,9 @@ class MeshEdgebreakerDecoderImpl {
     const attributeData = this._attributeData;
     const numAttrData = attributeData.length;
     let numPoints = 0;
-    const cornerToPointMap = new Int32Array(ct.numCorners());
+    // A corner's final point id is also its face-index entry. Write into the
+    // output buffer directly; the connectivity being traversed is separate.
+    const cornerToPointMap = mesh.faces_;
 
     const numVertices = ct.numVertices();
     // Flat connectivity for the inlined swingRight ring walk and per-attribute
@@ -929,14 +931,6 @@ class MeshEdgebreakerDecoderImpl {
       }
     }
 
-    const numFaces = mesh.numFaces();
-    const faces = mesh.faces_;
-    for (let f = 0; f < numFaces; ++f) {
-      const o = 3 * f;
-      faces[o] = cornerToPointMap[o];
-      faces[o + 1] = cornerToPointMap[o + 1];
-      faces[o + 2] = cornerToPointMap[o + 2];
-    }
     this._decoder.pointCloud().setNumPoints(numPoints);
     return true;
   }
