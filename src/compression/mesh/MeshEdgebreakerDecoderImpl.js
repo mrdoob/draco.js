@@ -223,10 +223,7 @@ class MeshEdgebreakerDecoderImpl {
 
     this._attributeData = [];
     for (let i = 0; i < numAttributeData; ++i) {
-      const ad = new AttributeData();
-      ad.attributeSeamCorners = new Int32Array(numFaces * 3);
-      ad.numSeamCorners = 0;
-      this._attributeData.push(ad);
+      this._attributeData.push(new AttributeData());
     }
 
     if (!this._cornerTable.reset(
@@ -274,13 +271,6 @@ class MeshEdgebreakerDecoderImpl {
     let previousConnectivityData = null;
     for (let i = 0; i < this._attributeData.length; ++i) {
       const connectivityData = this._attributeData[i].connectivityData;
-      connectivityData.initEmpty(this._cornerTable);
-      // Indexed loop avoids a for..of iterator per seam.
-      const seamCorners = this._attributeData[i].attributeSeamCorners;
-      const seamCount = this._attributeData[i].numSeamCorners;
-      for (let s = 0; s < seamCount; ++s) {
-        connectivityData.addSeamEdge(seamCorners[s]);
-      }
       if (connectivityData.hasSameSeams(previousConnectivityData)) {
         connectivityData.adoptVertexRecompute(previousConnectivityData);
       } else if (!connectivityData.recomputeVertices(null, null)) {
@@ -730,6 +720,12 @@ class MeshEdgebreakerDecoderImpl {
       this._traversalDecoder._attributeConnectivityDecoders;
     const numCorners = this._cornerTable.numCorners();
 
+    // Base connectivity is final. Mark each decoded seam directly, in the same
+    // per-attribute corner order, without staging a face-sized corner list.
+    for (let i = 0; i < numAttrData; ++i) {
+      attributeData[i].connectivityData.initEmpty(this._cornerTable);
+    }
+
     for (let corner = 0; corner < numCorners; corner += 3) {
       const srcFaceId = (corner / 3) | 0;
       for (let k = 0; k < 3; ++k) {
@@ -737,14 +733,12 @@ class MeshEdgebreakerDecoderImpl {
         const oppCorner = oppositeCorners[cc];
         if (oppCorner === kInvalidCornerIndex) {
           for (let i = 0; i < numAttrData; ++i) {
-            const ad = attributeData[i];
-            ad.attributeSeamCorners[ad.numSeamCorners++] = cc;
+            attributeData[i].connectivityData.addSeamEdge(cc);
           }
         } else if (((oppCorner / 3) | 0) >= srcFaceId) {
           for (let i = 0; i < numAttrData; ++i) {
             if (connectivityDecoders[i].decodeNextBit()) {
-              const ad = attributeData[i];
-              ad.attributeSeamCorners[ad.numSeamCorners++] = cc;
+              attributeData[i].connectivityData.addSeamEdge(cc);
             }
           }
         }
@@ -984,8 +978,6 @@ class AttributeData {
     this.connectivityData = new MeshAttributeCornerTable();
     this.isConnectivityUsed = true;
     this.encodingData = new MeshAttributeIndicesEncodingData();
-    this.attributeSeamCorners = new Int32Array(0);
-    this.numSeamCorners = 0;
   }
 
 }
