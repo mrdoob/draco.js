@@ -41,26 +41,6 @@ class GeometryAttribute {
     return this._buffer.data.subarray(bytePos);
   }
 
-  copyFrom(srcAtt) {
-    this._numComponents = srcAtt._numComponents;
-    this._dataType = srcAtt._dataType;
-    this._normalized = srcAtt._normalized;
-    this._byteStride = srcAtt._byteStride;
-    this._byteOffset = srcAtt._byteOffset;
-    this._attributeType = srcAtt._attributeType;
-    this._uniqueId = srcAtt._uniqueId;
-
-    if (srcAtt._buffer === null) {
-      this._buffer = null;
-    } else {
-      if (this._buffer === null) {
-        return false;
-      }
-      this._buffer.update(srcAtt._buffer.data, srcAtt._buffer.dataSize);
-    }
-    return true;
-  }
-
   resetBuffer(buffer, byteStride, byteOffset) {
     this._buffer = buffer;
     this._byteStride = byteStride;

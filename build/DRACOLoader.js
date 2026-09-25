@@ -85,52 +85,6 @@ const SymbolCodingMethod = {
 // Mask for setting and getting the bit for metadata in |flags| of header.
 const METADATA_FLAG_MASK = 0x8000;
 
-// compression/config/DracoOptions.js - ported from compression/config/draco_options.h
-
-// Base option class with global options and per-attribute options keyed by
-// attribute key (e.g. attribute type or id).
-class DracoOptions {
-
-  constructor() {
-    this._globalOptions = new Map(); // name -> value
-    this._attributeOptions = new Map(); // attributeKey -> Map(name -> value)
-  }
-
-  getGlobalBool(name, defaultVal) {
-    if (this._globalOptions.has(name)) {
-      return !!this._globalOptions.get(name);
-    }
-    return defaultVal;
-  }
-
-  findAttributeOptions(attKey) {
-    if (this._attributeOptions.has(attKey)) {
-      return this._attributeOptions.get(attKey);
-    }
-    return null;
-  }
-
-  getAttributeBool(attKey, name, defaultVal) {
-    const attOpts = this.findAttributeOptions(attKey);
-    if (attOpts !== null && attOpts.has(name)) {
-      return !!attOpts.get(name);
-    }
-    return this.getGlobalBool(name, defaultVal);
-  }
-
-}
-
-// compression/config/DecoderOptions.js - ported from compression/config/decoder_options.h
-
-
-class DecoderOptions extends DracoOptions {
-
-  constructor() {
-    super();
-  }
-
-}
-
 // core/BitUtils.js - ported from bit_utils.h/cc
 
 // Branchless inlined zigzag decode: (val>>>1) ^ -(val&1) avoids a per-value call/branch.
@@ -742,7 +696,6 @@ class PointCloudDecoder {
     this._buffer = null;
     this._versionMajor = 0;
     this._versionMinor = 0;
-    this._options = null;
     this._attributesDecoders = [];
     this._attributeToDecoderMap = [];
   }
@@ -782,8 +735,7 @@ class PointCloudDecoder {
   }
 
   // Main entry point for point cloud decoding.
-  decode(options, inBuffer, outPointCloud) {
-    this._options = options;
+  decode(inBuffer, outPointCloud) {
     this._buffer = inBuffer;
     this._pointCloud = outPointCloud;
 
@@ -884,10 +836,6 @@ class PointCloudDecoder {
     return this._buffer;
   }
 
-  options() {
-    return this._options;
-  }
-
   // -- Protected virtual methods (override in subclasses) --
 
   initializeDecoder() {
@@ -977,9 +925,9 @@ class MeshDecoder extends PointCloudDecoder {
     return EncodedGeometryType.TRIANGULAR_MESH;
   }
 
-  decodeMesh(options, inBuffer, outMesh) {
+  decodeMesh(inBuffer, outMesh) {
     this._mesh = outMesh;
-    return this.decode(options, inBuffer, outMesh);
+    return this.decode(inBuffer, outMesh);
   }
 
   getCornerTable() {
@@ -1494,26 +1442,6 @@ class GeometryAttribute {
     return this._buffer.data.subarray(bytePos);
   }
 
-  copyFrom(srcAtt) {
-    this._numComponents = srcAtt._numComponents;
-    this._dataType = srcAtt._dataType;
-    this._normalized = srcAtt._normalized;
-    this._byteStride = srcAtt._byteStride;
-    this._byteOffset = srcAtt._byteOffset;
-    this._attributeType = srcAtt._attributeType;
-    this._uniqueId = srcAtt._uniqueId;
-
-    if (srcAtt._buffer === null) {
-      this._buffer = null;
-    } else {
-      if (this._buffer === null) {
-        return false;
-      }
-      this._buffer.update(srcAtt._buffer.data, srcAtt._buffer.dataSize);
-    }
-    return true;
-  }
-
   resetBuffer(buffer, byteStride, byteOffset) {
     this._buffer = buffer;
     this._byteStride = byteStride;
@@ -1886,25 +1814,6 @@ class PointAttribute extends GeometryAttribute {
       }
     }
     return array;
-  }
-
-  copyFrom(srcAtt) {
-    if (this.buffer === null) {
-      this._attributeBuffer = new DataBuffer();
-      this.resetBuffer(this._attributeBuffer, 0, 0);
-    }
-    if (!super.copyFrom(srcAtt)) {
-      return;
-    }
-    this._identityMapping = srcAtt._identityMapping;
-    this._numUniqueEntries = srcAtt._numUniqueEntries;
-    this._indicesMap = srcAtt._indicesMap.slice();
-    if (srcAtt._attributeTransformData) {
-      // Shallow copy; transform data is normally set fresh during decode.
-      this._attributeTransformData = srcAtt._attributeTransformData;
-    } else {
-      this._attributeTransformData = null;
-    }
   }
 
 }
@@ -4917,17 +4826,6 @@ class SequentialAttributeDecodersController extends AttributesDecoder {
   transformAttributesToOriginalFormat() {
     const numAttributes = this.getNumAttributes();
     for (let i = 0; i < numAttributes; i++) {
-      if (this.getDecoder().options()) {
-        const attribute = this._sequentialDecoders[i].attribute;
-        const portableAttribute = this._sequentialDecoders[i].getPortableAttribute();
-        if (portableAttribute &&
-            this.getDecoder().options().getAttributeBool(
-              attribute.attributeType, 'skip_attribute_transform', false)) {
-          // Skip the transform: use the portable attribute as the output.
-          this._sequentialDecoders[i].attribute.copyFrom(portableAttribute);
-          continue;
-        }
-      }
       if (!this._sequentialDecoders[i].transformAttributeToOriginalFormat(
             this._pointIds)) {
         return false;
@@ -7519,12 +7417,6 @@ function createMeshDecoder(method) {
 // Decodes Draco-compressed meshes and point clouds.
 class Decoder {
 
-  constructor() {
-
-    this.options_ = new DecoderOptions();
-
-  }
-
   // Returns an EncodedGeometryType value, or INVALID_GEOMETRY_TYPE on error.
   static getEncodedGeometryType(inBuffer) {
 
@@ -7567,14 +7459,8 @@ class Decoder {
     }
 
     const decoder = createMeshDecoder(result.header.encoderMethod);
-    const status = decoder.decodeMesh(this.options_, inBuffer, outGeometry);
+    const status = decoder.decodeMesh(inBuffer, outGeometry);
     return { ok: status.ok(), message: status.errorMsg };
-
-  }
-
-  options() {
-
-    return this.options_;
 
   }
 

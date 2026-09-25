@@ -21,7 +21,6 @@ class PointCloudDecoder {
     this._buffer = null;
     this._versionMajor = 0;
     this._versionMinor = 0;
-    this._options = null;
     this._attributesDecoders = [];
     this._attributeToDecoderMap = [];
   }
@@ -61,8 +60,7 @@ class PointCloudDecoder {
   }
 
   // Main entry point for point cloud decoding.
-  decode(options, inBuffer, outPointCloud) {
-    this._options = options;
+  decode(inBuffer, outPointCloud) {
     this._buffer = inBuffer;
     this._pointCloud = outPointCloud;
 
@@ -161,10 +159,6 @@ class PointCloudDecoder {
 
   buffer() {
     return this._buffer;
-  }
-
-  options() {
-    return this._options;
   }
 
   // -- Protected virtual methods (override in subclasses) --

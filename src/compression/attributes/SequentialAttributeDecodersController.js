@@ -91,17 +91,6 @@ class SequentialAttributeDecodersController extends AttributesDecoder {
   transformAttributesToOriginalFormat() {
     const numAttributes = this.getNumAttributes();
     for (let i = 0; i < numAttributes; i++) {
-      if (this.getDecoder().options()) {
-        const attribute = this._sequentialDecoders[i].attribute;
-        const portableAttribute = this._sequentialDecoders[i].getPortableAttribute();
-        if (portableAttribute &&
-            this.getDecoder().options().getAttributeBool(
-              attribute.attributeType, 'skip_attribute_transform', false)) {
-          // Skip the transform: use the portable attribute as the output.
-          this._sequentialDecoders[i].attribute.copyFrom(portableAttribute);
-          continue;
-        }
-      }
       if (!this._sequentialDecoders[i].transformAttributeToOriginalFormat(
             this._pointIds)) {
         return false;

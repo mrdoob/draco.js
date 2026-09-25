@@ -5,7 +5,6 @@ import {
   MeshEncoderMethod,
   DracoHeader
 } from './config/CompressionShared.js';
-import { DecoderOptions } from './config/DecoderOptions.js';
 import { DecoderBuffer } from '../core/DecoderBuffer.js';
 import { Mesh } from '../mesh/Mesh.js';
 
@@ -47,12 +46,6 @@ function createMeshDecoder(method) {
 
 // Decodes Draco-compressed meshes and point clouds.
 class Decoder {
-
-  constructor() {
-
-    this.options_ = new DecoderOptions();
-
-  }
 
   // Returns an EncodedGeometryType value, or INVALID_GEOMETRY_TYPE on error.
   static getEncodedGeometryType(inBuffer) {
@@ -96,14 +89,8 @@ class Decoder {
     }
 
     const decoder = createMeshDecoder(result.header.encoderMethod);
-    const status = decoder.decodeMesh(this.options_, inBuffer, outGeometry);
+    const status = decoder.decodeMesh(inBuffer, outGeometry);
     return { ok: status.ok(), message: status.errorMsg };
-
-  }
-
-  options() {
-
-    return this.options_;
 
   }
 

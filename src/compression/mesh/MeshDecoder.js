@@ -14,9 +14,9 @@ class MeshDecoder extends PointCloudDecoder {
     return EncodedGeometryType.TRIANGULAR_MESH;
   }
 
-  decodeMesh(options, inBuffer, outMesh) {
+  decodeMesh(inBuffer, outMesh) {
     this._mesh = outMesh;
-    return this.decode(options, inBuffer, outMesh);
+    return this.decode(inBuffer, outMesh);
   }
 
   getCornerTable() {

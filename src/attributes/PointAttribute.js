@@ -298,25 +298,6 @@ class PointAttribute extends GeometryAttribute {
     return array;
   }
 
-  copyFrom(srcAtt) {
-    if (this.buffer === null) {
-      this._attributeBuffer = new DataBuffer();
-      this.resetBuffer(this._attributeBuffer, 0, 0);
-    }
-    if (!super.copyFrom(srcAtt)) {
-      return;
-    }
-    this._identityMapping = srcAtt._identityMapping;
-    this._numUniqueEntries = srcAtt._numUniqueEntries;
-    this._indicesMap = srcAtt._indicesMap.slice();
-    if (srcAtt._attributeTransformData) {
-      // Shallow copy; transform data is normally set fresh during decode.
-      this._attributeTransformData = srcAtt._attributeTransformData;
-    } else {
-      this._attributeTransformData = null;
-    }
-  }
-
 }
 
 export { PointAttribute };
