@@ -715,19 +715,18 @@ class MetadataDecoder {
     if (dataSize > this.buffer_.remainingSize) {
       return false;
     }
-    return this.buffer_.decodeBytes(dataSize) !== undefined;
+    this.buffer_.advance(dataSize);
+    return true;
   }
 
   // Skips a name (uint8 length prefix followed by that many bytes).
   _skipName() {
     const nameLen = this.buffer_.decodeUint8();
-    if (nameLen === undefined) {
+    if (nameLen === undefined || nameLen > this.buffer_.remainingSize) {
       return false;
     }
-    if (nameLen === 0) {
-      return true;
-    }
-    return this.buffer_.decodeBytes(nameLen) !== undefined;
+    this.buffer_.advance(nameLen);
+    return true;
   }
 
 }
