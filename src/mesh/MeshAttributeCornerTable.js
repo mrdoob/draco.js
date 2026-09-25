@@ -23,11 +23,11 @@ class MeshAttributeCornerTable {
       return false;
     }
 
-    // Typed arrays keep the per-corner hot accessors monomorphic. Uint8Array
-    // defaults to 0 (== false); corner_to_vertex_map_ uses a signed -1 sentinel.
+    // Only seam flags are needed before recomputation or adoption of an
+    // identical seam layout. Delay the corner map until recomputation is needed.
     this.is_edge_on_seam_ = new Uint8Array(table.numCorners());
     this.is_vertex_on_seam_ = new Uint8Array(table.numVertices());
-    this.corner_to_vertex_map_ = new Int32Array(table.numCorners()).fill(kInvalidVertexIndex);
+    this.corner_to_vertex_map_ = null;
     this.vertex_to_attribute_entry_id_map_ = [];
     this.vertex_to_left_most_corner_map_ = [];
     // Lazily built; see oppositeCornerArray.
@@ -79,7 +79,8 @@ class MeshAttributeCornerTable {
     const numBaseVertices = ct.numVertices();
     // Preallocate leftMostMap by new-vertex id (new-vertex count <= numCorners).
     const leftMostMap = new Int32Array(numCorners);
-    const cornerToVertex = this.corner_to_vertex_map_;
+    const cornerToVertex = new Int32Array(numCorners).fill(kInvalidVertexIndex);
+    this.corner_to_vertex_map_ = cornerToVertex;
     const isVertexOnSeam = this.is_vertex_on_seam_;
     const isEdgeOnSeam = this.is_edge_on_seam_;
     // Flat connectivity arrays so the per-corner swings inline to typed-array
