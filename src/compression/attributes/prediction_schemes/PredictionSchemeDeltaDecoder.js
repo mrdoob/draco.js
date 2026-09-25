@@ -11,10 +11,6 @@ class PredictionSchemeDeltaDecoder extends PredictionSchemeDecoder {
     super(attribute, transform);
   }
 
-  isInitialized() {
-    return true;
-  }
-
   computeOriginalValues(inCorr, outData, size, numComponents, entryToPointIdMap) {
     this._transform.init(numComponents);
 

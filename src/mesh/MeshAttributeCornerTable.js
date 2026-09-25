@@ -213,42 +213,6 @@ class MeshAttributeCornerTable {
 
   }
 
-  vertex(corner) {
-
-    return this.confidentVertex(corner);
-
-  }
-
-  confidentVertex(corner) {
-
-    return this.corner_to_vertex_map_[corner];
-
-  }
-
-  leftMostCorner(v) {
-
-    return this.vertex_to_left_most_corner_map_[v];
-
-  }
-
-  face(corner) {
-
-    return this.corner_table_.face(corner);
-
-  }
-
-  firstCorner(faceIndex) {
-
-    return this.corner_table_.firstCorner(faceIndex);
-
-  }
-
-  allCorners(faceIndex) {
-
-    return this.corner_table_.allCorners(faceIndex);
-
-  }
-
   // --- Flat-array accessors: let DepthFirstTraverser avoid per-corner dispatch. ---
 
   cornerToVertexArray() {
@@ -296,12 +260,6 @@ class MeshAttributeCornerTable {
     this.vertex_to_left_most_corner_map_ = other.vertex_to_left_most_corner_map_;
     this.no_interior_seams_ = other.no_interior_seams_;
     this._effectiveOpposite = other._effectiveOpposite;
-  }
-
-  isDegenerated(faceIndex) {
-
-    return this.corner_table_.isDegenerated(faceIndex);
-
   }
 
 }

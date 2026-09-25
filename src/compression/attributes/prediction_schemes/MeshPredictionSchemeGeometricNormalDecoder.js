@@ -20,13 +20,6 @@ class MeshPredictionSchemeGeometricNormalDecoder extends MeshPredictionSchemeDec
     this._flipNormalBitDecoder = new RAnsBitDecoder();
   }
 
-  isInitialized() {
-    if (!this._predictor.isInitialized()) return false;
-    if (!this._meshData.isInitialized()) return false;
-    if (!this._octahedronToolBox.isInitialized()) return false;
-    return true;
-  }
-
   getNumParentAttributes() {
     return 1;
   }

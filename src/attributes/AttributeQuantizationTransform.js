@@ -108,11 +108,6 @@ class AttributeQuantizationTransform extends AttributeTransform {
     return true;
   }
 
-  get quantizationBits() { return this._quantizationBits; }
-  get range() { return this._range; }
-
-  minValue(axis) { return this._minValues[axis]; }
-
   static _isQuantizationValid(quantizationBits) {
     return quantizationBits >= 1 && quantizationBits <= 30;
   }

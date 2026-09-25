@@ -71,10 +71,6 @@ class MeshPredictionSchemeGeometricNormalPredictorArea {
     this._entryToPointIdMap = map;
   }
 
-  isInitialized() {
-    return this._posAttribute !== null && this._entryToPointIdMap !== null;
-  }
-
   buildPositionCache(numEntries) {
     this._posCache = buildInt32PositionCache(
       this._posAttribute, this._entryToPointIdMap, numEntries, this._tempPos);

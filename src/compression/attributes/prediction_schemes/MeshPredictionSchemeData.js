@@ -25,13 +25,6 @@ class MeshPredictionSchemeData {
 
   get dataToCornerMap() { return this._dataToCornerMap; }
 
-  isInitialized() {
-    return this._mesh !== null &&
-           this._cornerTable !== null &&
-           this._vertexToDataMap !== null &&
-           this._dataToCornerMap !== null;
-  }
-
 }
 
 export { MeshPredictionSchemeData };

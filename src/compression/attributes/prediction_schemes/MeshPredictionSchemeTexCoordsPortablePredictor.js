@@ -91,10 +91,6 @@ class MeshPredictionSchemeTexCoordsPortablePredictor {
     this._entryToPointIdMap = map;
   }
 
-  isInitialized() {
-    return this._posAttribute !== null;
-  }
-
   get predictedValue() {
     return this._predictedValue;
   }

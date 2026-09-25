@@ -15,10 +15,6 @@ class MeshPredictionSchemeMultiParallelogramDecoder extends MeshPredictionScheme
     super(attribute, transform, meshData);
   }
 
-  isInitialized() {
-    return this._meshData.isInitialized();
-  }
-
   computeOriginalValues(inCorr, outData, size, numComponents, entryToPointIdMap) {
     this._transform.init(numComponents);
 

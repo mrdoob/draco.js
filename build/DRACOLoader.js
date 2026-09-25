@@ -1680,14 +1680,6 @@ class PointAttribute extends GeometryAttribute {
     }
   }
 
-  init(attributeType, numComponents, dataType, normalized, numAttributeValues) {
-    this._attributeBuffer = new DataBuffer();
-    const byteStride = dataTypeLength(dataType) * numComponents;
-    super.init(attributeType, this._attributeBuffer, numComponents, dataType, normalized, byteStride, 0);
-    this.reset(numAttributeValues);
-    this.setIdentityMapping();
-  }
-
   reset(numAttributeValues) {
     if (this._attributeBuffer === null) {
       this._attributeBuffer = new DataBuffer();
@@ -2243,10 +2235,6 @@ class SequentialAttributeDecoder {
  */
 class PredictionSchemeDecoderInterface {
 
-  isInitialized() {
-    return false;
-  }
-
   /** True if all correction values are guaranteed to be positive. */
   areCorrectionsPositive() {
     return false;
@@ -2327,10 +2315,6 @@ class PredictionSchemeDeltaDecoder extends PredictionSchemeDecoder {
     super(attribute, transform);
   }
 
-  isInitialized() {
-    return true;
-  }
-
   computeOriginalValues(inCorr, outData, size, numComponents, entryToPointIdMap) {
     this._transform.init(numComponents);
 
@@ -2383,10 +2367,6 @@ class MeshPredictionSchemeParallelogramDecoder extends MeshPredictionSchemeDecod
 
   constructor(attribute, transform, meshData) {
     super(attribute, transform, meshData);
-  }
-
-  isInitialized() {
-    return this._meshData.isInitialized();
   }
 
   computeOriginalValues(inCorr, outData, size, numComponents, entryToPointIdMap) {
@@ -2831,10 +2811,6 @@ class MeshPredictionSchemeMultiParallelogramDecoder extends MeshPredictionScheme
     super(attribute, transform, meshData);
   }
 
-  isInitialized() {
-    return this._meshData.isInitialized();
-  }
-
   computeOriginalValues(inCorr, outData, size, numComponents, entryToPointIdMap) {
     this._transform.init(numComponents);
 
@@ -2983,10 +2959,6 @@ class MeshPredictionSchemeConstrainedMultiParallelogramDecoder extends MeshPredi
     for (let i = 0; i < MAX_NUM_PARALLELOGRAMS; ++i) {
       this._isCreaseEdge.push([]);
     }
-  }
-
-  isInitialized() {
-    return this._meshData.isInitialized();
   }
 
   decodePredictionData(buffer) {
@@ -3187,10 +3159,6 @@ class MeshPredictionSchemeTexCoordsPortablePredictor {
 
   setEntryToPointIdMap(map) {
     this._entryToPointIdMap = map;
-  }
-
-  isInitialized() {
-    return this._posAttribute !== null;
   }
 
   get predictedValue() {
@@ -3442,12 +3410,6 @@ class MeshPredictionSchemeTexCoordsPortableDecoder extends MeshPredictionSchemeD
     this._predictor = new MeshPredictionSchemeTexCoordsPortablePredictor(meshData);
   }
 
-  isInitialized() {
-    if (!this._predictor.isInitialized()) return false;
-    if (!this._meshData.isInitialized()) return false;
-    return true;
-  }
-
   getNumParentAttributes() {
     return 1;
   }
@@ -3533,10 +3495,6 @@ class OctahedronToolBox {
     this._dequantizationScale = Math.fround(2.0 / Math.fround(this._maxValue));
     this._centerValue = (this._maxValue / 2) | 0;
     return true;
-  }
-
-  isInitialized() {
-    return this._quantizationBits !== -1;
   }
 
   quantizationBits() { return this._quantizationBits; }
@@ -3712,10 +3670,6 @@ class MeshPredictionSchemeGeometricNormalPredictorArea {
     this._entryToPointIdMap = map;
   }
 
-  isInitialized() {
-    return this._posAttribute !== null && this._entryToPointIdMap !== null;
-  }
-
   buildPositionCache(numEntries) {
     this._posCache = buildInt32PositionCache(
       this._posAttribute, this._entryToPointIdMap, numEntries, this._tempPos);
@@ -3849,13 +3803,6 @@ class MeshPredictionSchemeGeometricNormalDecoder extends MeshPredictionSchemeDec
     this._flipNormalBitDecoder = new RAnsBitDecoder();
   }
 
-  isInitialized() {
-    if (!this._predictor.isInitialized()) return false;
-    if (!this._meshData.isInitialized()) return false;
-    if (!this._octahedronToolBox.isInitialized()) return false;
-    return true;
-  }
-
   getNumParentAttributes() {
     return 1;
   }
@@ -3952,13 +3899,6 @@ class MeshPredictionSchemeData {
   get vertexToDataMap() { return this._vertexToDataMap; }
 
   get dataToCornerMap() { return this._dataToCornerMap; }
-
-  isInitialized() {
-    return this._mesh !== null &&
-           this._cornerTable !== null &&
-           this._vertexToDataMap !== null &&
-           this._dataToCornerMap !== null;
-  }
 
 }
 
@@ -4409,25 +4349,11 @@ class AttributeTransformData {
 
 class AttributeTransform {
 
-  // Virtual: override in subclass.
-  copyToAttributeTransformData(/* outData */) {
-  }
-
   transferToAttribute(attribute) {
     const transformData = new AttributeTransformData();
     this.copyToAttributeTransformData(transformData);
     attribute.setAttributeTransformData(transformData);
     return true;
-  }
-
-  // Virtual: override in subclass.
-  inverseTransformAttribute(/* attribute, targetAttribute */) {
-    return false;
-  }
-
-  // Virtual: override in subclass.
-  decodeParameters(/* attribute, decoderBuffer */) {
-    return false;
   }
 
 }
@@ -4560,11 +4486,6 @@ class AttributeQuantizationTransform extends AttributeTransform {
     }
     return true;
   }
-
-  get quantizationBits() { return this._quantizationBits; }
-  get range() { return this._range; }
-
-  minValue(axis) { return this._minValues[axis]; }
 
   static _isQuantizationValid(quantizationBits) {
     return quantizationBits >= 1 && quantizationBits <= 30;
@@ -6110,42 +6031,6 @@ class MeshAttributeCornerTable {
 
   }
 
-  vertex(corner) {
-
-    return this.confidentVertex(corner);
-
-  }
-
-  confidentVertex(corner) {
-
-    return this.corner_to_vertex_map_[corner];
-
-  }
-
-  leftMostCorner(v) {
-
-    return this.vertex_to_left_most_corner_map_[v];
-
-  }
-
-  face(corner) {
-
-    return this.corner_table_.face(corner);
-
-  }
-
-  firstCorner(faceIndex) {
-
-    return this.corner_table_.firstCorner(faceIndex);
-
-  }
-
-  allCorners(faceIndex) {
-
-    return this.corner_table_.allCorners(faceIndex);
-
-  }
-
   // --- Flat-array accessors: let DepthFirstTraverser avoid per-corner dispatch. ---
 
   cornerToVertexArray() {
@@ -6193,12 +6078,6 @@ class MeshAttributeCornerTable {
     this.vertex_to_left_most_corner_map_ = other.vertex_to_left_most_corner_map_;
     this.no_interior_seams_ = other.no_interior_seams_;
     this._effectiveOpposite = other._effectiveOpposite;
-  }
-
-  isDegenerated(faceIndex) {
-
-    return this.corner_table_.isDegenerated(faceIndex);
-
   }
 
 }

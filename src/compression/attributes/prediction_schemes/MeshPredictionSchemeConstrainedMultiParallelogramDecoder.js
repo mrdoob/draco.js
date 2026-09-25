@@ -23,10 +23,6 @@ class MeshPredictionSchemeConstrainedMultiParallelogramDecoder extends MeshPredi
     }
   }
 
-  isInitialized() {
-    return this._meshData.isInitialized();
-  }
-
   decodePredictionData(buffer) {
     // Decode crease edge flags via rANS bit coder, one context per parallelogram count.
     for (let i = 0; i < MAX_NUM_PARALLELOGRAMS; ++i) {

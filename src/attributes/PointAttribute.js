@@ -27,14 +27,6 @@ class PointAttribute extends GeometryAttribute {
     }
   }
 
-  init(attributeType, numComponents, dataType, normalized, numAttributeValues) {
-    this._attributeBuffer = new DataBuffer();
-    const byteStride = dataTypeLength(dataType) * numComponents;
-    super.init(attributeType, this._attributeBuffer, numComponents, dataType, normalized, byteStride, 0);
-    this.reset(numAttributeValues);
-    this.setIdentityMapping();
-  }
-
   reset(numAttributeValues) {
     if (this._attributeBuffer === null) {
       this._attributeBuffer = new DataBuffer();

@@ -5,10 +5,6 @@
  */
 class PredictionSchemeDecoderInterface {
 
-  isInitialized() {
-    return false;
-  }
-
   /** True if all correction values are guaranteed to be positive. */
   areCorrectionsPositive() {
     return false;

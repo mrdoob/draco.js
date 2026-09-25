@@ -17,12 +17,6 @@ class MeshPredictionSchemeTexCoordsPortableDecoder extends MeshPredictionSchemeD
     this._predictor = new MeshPredictionSchemeTexCoordsPortablePredictor(meshData);
   }
 
-  isInitialized() {
-    if (!this._predictor.isInitialized()) return false;
-    if (!this._meshData.isInitialized()) return false;
-    return true;
-  }
-
   getNumParentAttributes() {
     return 1;
   }

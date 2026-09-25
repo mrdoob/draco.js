@@ -24,10 +24,6 @@ class OctahedronToolBox {
     return true;
   }
 
-  isInitialized() {
-    return this._quantizationBits !== -1;
-  }
-
   quantizationBits() { return this._quantizationBits; }
 
   // Canonicalizes edge points into consistent quadrants. Writes result into
