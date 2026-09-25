@@ -26,11 +26,7 @@ class SequentialQuantizationAttributeDecoder extends SequentialIntegerAttributeD
   }
 
   decodeDataNeededByPortableTransform(pointIds, buffer) {
-    if (!this._decodeQuantizedDataInfo()) {
-      return false;
-    }
-
-    return this._quantizationTransform.transferToAttribute(this.portableAttribute);
+    return this._decodeQuantizedDataInfo();
   }
 
   // Override: dequantize the values instead of a generic integer store.

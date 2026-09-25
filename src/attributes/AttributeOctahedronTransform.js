@@ -1,21 +1,13 @@
 // attributes/AttributeOctahedronTransform.js - ported from attributes/attribute_octahedron_transform.h/cc
 
-import { AttributeTransform } from './AttributeTransform.js';
-import { AttributeTransformType } from './AttributeTransformType.js';
 import { DataType } from '../core/DracoTypes.js';
 // Reuse the shared OctahedronToolBox (decode math is identical) instead of a hand-synced inline copy.
 import { OctahedronToolBox } from '../compression/attributes/NormalCompressionUtils.js';
 
-class AttributeOctahedronTransform extends AttributeTransform {
+class AttributeOctahedronTransform {
 
   constructor() {
-    super();
     this._quantizationBits = -1;
-  }
-
-  copyToAttributeTransformData(outData) {
-    outData.transformType = AttributeTransformType.OCTAHEDRON_TRANSFORM;
-    outData.appendParameterValue(this._quantizationBits, 'int32');
   }
 
   decodeParameters(attribute, decoderBuffer) {

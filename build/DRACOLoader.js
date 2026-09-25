@@ -1473,23 +1473,13 @@ class DataBuffer {
     this._data = new Uint8Array(0);
   }
 
-  update(data, size, offset = 0) {
-    if (data === null || data === undefined) {
-      if (size + offset < 0) return false;
-      this._resize(size + offset);
-    } else {
-      if (size < 0) return false;
-      if (size + offset > this._data.length) {
-        this._resize(size + offset);
-      }
-      const src = new Uint8Array(data.buffer || data, data.byteOffset || 0, size);
-      this._data.set(src, offset);
-    }
-    return true;
-  }
-
   resize(newSize) {
-    this._resize(newSize);
+    if (newSize < 0) return false;
+    if (newSize === this._data.length) return true;
+    const newData = new Uint8Array(newSize);
+    newData.set(this._data.subarray(0, Math.min(this._data.length, newSize)));
+    this._data = newData;
+    return true;
   }
 
   write(bytePos, inArray, dataSize) {
@@ -1504,15 +1494,6 @@ class DataBuffer {
   }
 
   get data() { return this._data; }
-  get dataSize() { return this._data.length; }
-
-  _resize(newSize) {
-    if (newSize === this._data.length) return;
-    const newData = new Uint8Array(newSize);
-    newData.set(this._data.subarray(0, Math.min(this._data.length, newSize)));
-    this._data = newData;
-  }
-
 }
 
 // attributes/GeometryIndices.js - ported from attributes/geometry_indices.h
@@ -1531,7 +1512,6 @@ class PointAttribute extends GeometryAttribute {
     this._numUniqueEntries = 0;
     this._indicesMap = [];
     this._attributeBuffer = null;
-    this._attributeTransformData = null;
 
     if (geometryAttribute instanceof GeometryAttribute) {
       this._buffer = geometryAttribute._buffer;
@@ -1550,7 +1530,7 @@ class PointAttribute extends GeometryAttribute {
       this._attributeBuffer = new DataBuffer();
     }
     const entrySize = dataTypeLength(this.dataType) * this.numComponents;
-    this._attributeBuffer.update(null, numAttributeValues * entrySize);
+    this._attributeBuffer.resize(numAttributeValues * entrySize);
     this.resetBuffer(this._attributeBuffer, entrySize, 0);
     this._numUniqueEntries = numAttributeValues;
     return true;
@@ -1598,10 +1578,6 @@ class PointAttribute extends GeometryAttribute {
     // Must be UNSIGNED so the 0xFFFFFFFF invalid sentinel round-trips intact.
     this._indicesMap = new Uint32Array(numPoints);
     this._indicesMap.fill(kInvalidAttributeValueIndex);
-  }
-
-  setAttributeTransformData(transformData) {
-    this._attributeTransformData = transformData;
   }
 
   // Mirrors C++ PointAttribute::ConvertValue<T>().
@@ -4059,82 +4035,6 @@ class SequentialIntegerAttributeDecoder extends SequentialAttributeDecoder {
 
 }
 
-// attributes/AttributeTransformType.js - ported from attributes/attribute_transform_type.h
-
-const AttributeTransformType = {
-  INVALID: -1,
-  QUANTIZATION_TRANSFORM: 1,
-  OCTAHEDRON_TRANSFORM: 2
-};
-
-// attributes/AttributeTransformData.js - ported from attributes/attribute_transform_data.h
-
-
-class AttributeTransformData {
-
-  constructor() {
-    this._transformType = AttributeTransformType.INVALID;
-    this._buffer = new DataBuffer();
-  }
-
-  get transformType() {
-    return this._transformType;
-  }
-
-  set transformType(type) {
-    this._transformType = type;
-  }
-
-  setParameterValue(byteOffset, value, type) {
-    const sizeNeeded = byteOffset + this._typeSize(type);
-    if (sizeNeeded > this._buffer.dataSize) {
-      this._buffer.resize(sizeNeeded);
-    }
-    const data = this._buffer.data;
-    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    switch (type) {
-      case 'int32': view.setInt32(byteOffset, value, true); break;
-      case 'uint32': view.setUint32(byteOffset, value, true); break;
-      case 'float32': view.setFloat32(byteOffset, value, true); break;
-      case 'float64': view.setFloat64(byteOffset, value, true); break;
-      case 'int8': view.setInt8(byteOffset, value); break;
-      case 'uint8': view.setUint8(byteOffset, value); break;
-      case 'int16': view.setInt16(byteOffset, value, true); break;
-      case 'uint16': view.setUint16(byteOffset, value, true); break;
-      default: view.setInt32(byteOffset, value, true); break;
-    }
-  }
-
-  appendParameterValue(value, type) {
-    this.setParameterValue(this._buffer.dataSize, value, type);
-  }
-
-  _typeSize(type) {
-    switch (type) {
-      case 'int8': case 'uint8': return 1;
-      case 'int16': case 'uint16': return 2;
-      case 'int32': case 'uint32': case 'float32': return 4;
-      case 'float64': return 8;
-      default: return 4;
-    }
-  }
-
-}
-
-// attributes/AttributeTransform.js - ported from attributes/attribute_transform.h/cc
-
-
-class AttributeTransform {
-
-  transferToAttribute(attribute) {
-    const transformData = new AttributeTransformData();
-    this.copyToAttributeTransformData(transformData);
-    attribute.setAttributeTransformData(transformData);
-    return true;
-  }
-
-}
-
 // core/QuantizationUtils.js - ported from quantization_utils.h/cc
 // (Decoder-only: the encoder-side Quantizer is not ported.)
 
@@ -4161,22 +4061,12 @@ class Dequantizer {
 // attributes/AttributeQuantizationTransform.js - ported from attributes/attribute_quantization_transform.h/cc
 
 
-class AttributeQuantizationTransform extends AttributeTransform {
+class AttributeQuantizationTransform {
 
   constructor() {
-    super();
     this._quantizationBits = -1;
     this._minValues = [];
     this._range = 0;
-  }
-
-  copyToAttributeTransformData(outData) {
-    outData.transformType = AttributeTransformType.QUANTIZATION_TRANSFORM;
-    outData.appendParameterValue(this._quantizationBits, 'int32');
-    for (let i = 0; i < this._minValues.length; i++) {
-      outData.appendParameterValue(this._minValues[i], 'float32');
-    }
-    outData.appendParameterValue(this._range, 'float32');
   }
 
   decodeParameters(attribute, decoderBuffer) {
@@ -4295,11 +4185,7 @@ class SequentialQuantizationAttributeDecoder extends SequentialIntegerAttributeD
   }
 
   decodeDataNeededByPortableTransform(pointIds, buffer) {
-    if (!this._decodeQuantizedDataInfo()) {
-      return false;
-    }
-
-    return this._quantizationTransform.transferToAttribute(this.portableAttribute);
+    return this._decodeQuantizedDataInfo();
   }
 
   // Override: dequantize the values instead of a generic integer store.
@@ -4327,16 +4213,10 @@ class SequentialQuantizationAttributeDecoder extends SequentialIntegerAttributeD
 // attributes/AttributeOctahedronTransform.js - ported from attributes/attribute_octahedron_transform.h/cc
 
 
-class AttributeOctahedronTransform extends AttributeTransform {
+class AttributeOctahedronTransform {
 
   constructor() {
-    super();
     this._quantizationBits = -1;
-  }
-
-  copyToAttributeTransformData(outData) {
-    outData.transformType = AttributeTransformType.OCTAHEDRON_TRANSFORM;
-    outData.appendParameterValue(this._quantizationBits, 'int32');
   }
 
   decodeParameters(attribute, decoderBuffer) {
@@ -4704,12 +4584,9 @@ class SequentialNormalAttributeDecoder extends SequentialIntegerAttributeDecoder
   }
 
   decodeDataNeededByPortableTransform(pointIds, buffer) {
-    if (!this._octahedralTransform.decodeParameters(
-          this.getPortableAttribute(), buffer)) {
-      return false;
-    }
-
-    return this._octahedralTransform.transferToAttribute(this.portableAttribute);
+    return this._octahedralTransform.decodeParameters(
+      this.getPortableAttribute(), buffer
+    );
   }
 
   _storeValues(numPoints) {

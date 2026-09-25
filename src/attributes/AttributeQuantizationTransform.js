@@ -1,26 +1,14 @@
 // attributes/AttributeQuantizationTransform.js - ported from attributes/attribute_quantization_transform.h/cc
 
-import { AttributeTransform } from './AttributeTransform.js';
-import { AttributeTransformType } from './AttributeTransformType.js';
 import { DataType } from '../core/DracoTypes.js';
 import { Dequantizer } from '../core/QuantizationUtils.js';
 
-class AttributeQuantizationTransform extends AttributeTransform {
+class AttributeQuantizationTransform {
 
   constructor() {
-    super();
     this._quantizationBits = -1;
     this._minValues = [];
     this._range = 0;
-  }
-
-  copyToAttributeTransformData(outData) {
-    outData.transformType = AttributeTransformType.QUANTIZATION_TRANSFORM;
-    outData.appendParameterValue(this._quantizationBits, 'int32');
-    for (let i = 0; i < this._minValues.length; i++) {
-      outData.appendParameterValue(this._minValues[i], 'float32');
-    }
-    outData.appendParameterValue(this._range, 'float32');
   }
 
   decodeParameters(attribute, decoderBuffer) {

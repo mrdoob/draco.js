@@ -13,7 +13,6 @@ class PointAttribute extends GeometryAttribute {
     this._numUniqueEntries = 0;
     this._indicesMap = [];
     this._attributeBuffer = null;
-    this._attributeTransformData = null;
 
     if (geometryAttribute instanceof GeometryAttribute) {
       this._buffer = geometryAttribute._buffer;
@@ -32,7 +31,7 @@ class PointAttribute extends GeometryAttribute {
       this._attributeBuffer = new DataBuffer();
     }
     const entrySize = dataTypeLength(this.dataType) * this.numComponents;
-    this._attributeBuffer.update(null, numAttributeValues * entrySize);
+    this._attributeBuffer.resize(numAttributeValues * entrySize);
     this.resetBuffer(this._attributeBuffer, entrySize, 0);
     this._numUniqueEntries = numAttributeValues;
     return true;
@@ -80,10 +79,6 @@ class PointAttribute extends GeometryAttribute {
     // Must be UNSIGNED so the 0xFFFFFFFF invalid sentinel round-trips intact.
     this._indicesMap = new Uint32Array(numPoints);
     this._indicesMap.fill(kInvalidAttributeValueIndex);
-  }
-
-  setAttributeTransformData(transformData) {
-    this._attributeTransformData = transformData;
   }
 
   // Mirrors C++ PointAttribute::ConvertValue<T>().

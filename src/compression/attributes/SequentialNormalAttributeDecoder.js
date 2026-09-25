@@ -36,12 +36,9 @@ class SequentialNormalAttributeDecoder extends SequentialIntegerAttributeDecoder
   }
 
   decodeDataNeededByPortableTransform(pointIds, buffer) {
-    if (!this._octahedralTransform.decodeParameters(
-          this.getPortableAttribute(), buffer)) {
-      return false;
-    }
-
-    return this._octahedralTransform.transferToAttribute(this.portableAttribute);
+    return this._octahedralTransform.decodeParameters(
+      this.getPortableAttribute(), buffer
+    );
   }
 
   _storeValues(numPoints) {
