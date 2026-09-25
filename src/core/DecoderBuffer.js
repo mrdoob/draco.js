@@ -1,7 +1,6 @@
 // core/DecoderBuffer.js - ported from decoder_buffer.h/cc
 
 import { decodeVarint } from './VarintDecoding.js';
-import { bitstreamVersion } from './Macros.js';
 
 class BitDecoder {
 
@@ -138,15 +137,6 @@ export class DecoderBuffer {
     return val;
   }
 
-  decodeUint64() {
-    if (this._pos + 8 > this._dataSize) return undefined;
-    const lo = this._dataView.getUint32(this._pos, true);
-    const hi = this._dataView.getUint32(this._pos + 4, true);
-    this._pos += 8;
-    // BigInt-free number, safe up to 2^53.
-    return hi * 0x100000000 + lo;
-  }
-
   decodeBytes(size) {
     if (this._pos + size > this._dataSize) return undefined;
     const result = this._data.slice(this._pos, this._pos + size);
@@ -157,13 +147,9 @@ export class DecoderBuffer {
   startBitDecoding(decodeSize) {
     let outSize = 0;
     if (decodeSize) {
-      if (this._bitstreamVersion < bitstreamVersion(2, 2)) {
-        outSize = this.decodeUint64();
-        if (outSize === undefined) return undefined;
-      } else {
-        outSize = decodeVarint(this, false);
-        if (outSize === undefined) return undefined;
-      }
+      // Mesh decoding rejects pre-2.2 streams before reading any bit data.
+      outSize = decodeVarint(this, false);
+      if (outSize === undefined) return undefined;
     }
     this._bitMode = true;
     this._bitDecoder.reset(

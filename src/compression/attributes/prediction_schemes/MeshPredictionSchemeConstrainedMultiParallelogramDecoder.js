@@ -6,7 +6,6 @@ import { RAnsBitDecoder } from '../../bit_coders/RAnsBitDecoder.js';
 
 const kInvalidCornerIndex = -1;
 
-const OPTIMAL_MULTI_PARALLELOGRAM = 0;
 const MAX_NUM_PARALLELOGRAMS = 4;
 
 /**
@@ -17,7 +16,6 @@ class MeshPredictionSchemeConstrainedMultiParallelogramDecoder extends MeshPredi
 
   constructor(attribute, transform, meshData) {
     super(attribute, transform, meshData);
-    this._selectedMode = OPTIMAL_MULTI_PARALLELOGRAM;
     // Crease edges stored per context (number of available parallelograms).
     this._isCreaseEdge = [];
     for (let i = 0; i < MAX_NUM_PARALLELOGRAMS; ++i) {
@@ -30,12 +28,6 @@ class MeshPredictionSchemeConstrainedMultiParallelogramDecoder extends MeshPredi
   }
 
   decodePredictionData(buffer) {
-    if (buffer.bitstreamVersion < 0x0202) {
-      const mode = buffer.decodeUint8();
-      if (mode === undefined) return false;
-      if (mode !== OPTIMAL_MULTI_PARALLELOGRAM) return false;
-    }
-
     // Decode crease edge flags via rANS bit coder, one context per parallelogram count.
     for (let i = 0; i < MAX_NUM_PARALLELOGRAMS; ++i) {
       const numFlags = buffer.decodeVarintUint32();
