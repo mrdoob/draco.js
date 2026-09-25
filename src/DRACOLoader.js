@@ -239,8 +239,10 @@ class DRACOLoader extends Loader {
 		// Extract face indices.
 
 		const numFaces = dracoGeometry.numFaces();
-		const index = new Uint32Array( numFaces * 3 );
-		index.set( dracoGeometry.faces_.subarray( 0, numFaces * 3 ) );
+		const faces = dracoGeometry.faces_;
+		// The decoded mesh is private to this geometry. Keep its index buffer,
+		// reinterpreting signed storage as the unsigned type required by three.
+		const index = new Uint32Array( faces.buffer, faces.byteOffset, numFaces * 3 );
 
 		geometry.setIndex( new BufferAttribute( index, 1 ) );
 
