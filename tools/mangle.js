@@ -33,6 +33,8 @@ for (const name of [
   'setDecoderPath', 'setDecoderConfig', 'setWorkerLimit', 'preload', 'dispose',
   'setPath', 'setResourcePath', 'setCrossOrigin', 'setRequestHeader', 'setWithCredentials',
   'defaultAttributeIDs', 'defaultAttributeTypes',
+  // Configuration supplied by callers of decodeGeometry().
+  'attributeIDs', 'attributeTypes', 'useUniqueIDs', 'vertexColorSpace',
   // Default attribute names — they become three geometry attribute names.
   'position', 'normal', 'color', 'uv',
 ]) boundary.add(name);

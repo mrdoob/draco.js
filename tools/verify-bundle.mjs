@@ -78,16 +78,22 @@ function hashGeometry(geom) {
 }
 
 async function decodeAll(LoaderClass, buffers) {
-  // Use the public decodeDracoFile entry point so each loader builds its
-  // taskConfig internally — the config's keys are mangled in the min bundle,
-  // so a hand-built config would only be read correctly by the readable one.
+  // Supply the public configuration from outside the bundle. Its keys must
+  // survive property mangling, just like the public method names.
   const loader = new LoaderClass();
   const hashes = [];
   for (const ab of buffers) {
-    const geom = await new Promise((resolve, reject) =>
-      loader.decodeDracoFile(ab, resolve, null, null, undefined, reject));
+    const geom = await loader.decodeGeometry(ab, {
+      attributeIDs: loader.defaultAttributeIDs,
+      attributeTypes: loader.defaultAttributeTypes,
+      useUniqueIDs: false,
+      vertexColorSpace: 'srgb-linear',
+    });
+    if (!geom.attributes.position?.count) throw new Error('Missing decoded position attribute');
     hashes.push(hashGeometry(geom));
+    geom.dispose();
   }
+  loader.dispose();
   return hashes;
 }
 
