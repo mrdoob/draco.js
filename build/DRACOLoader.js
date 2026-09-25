@@ -1234,16 +1234,16 @@ class RAnsDecoder {
     const LutArray = numSymbols <= 256 ? Uint8Array
       : (numSymbols <= 65536 ? Uint16Array : Uint32Array);
     const lutTable = new LutArray(this.ransPrecision);
-    const probTable = new Uint32Array(numSymbols);
     const cumProbTable = new Uint32Array(numSymbols);
     this.lutTable = lutTable;
-    this.probTable = probTable;
+    // RAnsSymbolDecoder owns this table and never changes it during decoding.
+    // Retain it instead of allocating and copying identical probabilities.
+    this.probTable = tokenProbs;
     this.cumProbTable = cumProbTable;
     let cumProb = 0;
     let actProb = 0;
     for (let i = 0; i < numSymbols; ++i) {
       const prob = tokenProbs[i];
-      probTable[i] = prob;
       cumProbTable[i] = cumProb;
       cumProb += prob;
       if (cumProb > this.ransPrecision) {
