@@ -3906,7 +3906,7 @@ class MeshPredictionSchemeData {
 
 
 function createMeshPredictionSchemeDecoder(method, attribute, transform,
-  meshData, bitstreamVersion, transformType) {
+  meshData, transformType) {
 
   // Normal octahedron transforms only support geometric normal prediction.
   if (transformType === PredictionSchemeTransformType.PREDICTION_TRANSFORM_NORMAL_OCTAHEDRON_CANONICALIZED ||
@@ -3972,26 +3972,16 @@ function createPredictionSchemeForDecoder(method, attId, decoder, transform) {
       const meshData = new MeshPredictionSchemeData();
       const attCornerTable = meshDecoder.getAttributeCornerTable(attId);
 
-      if (attCornerTable !== null) {
-        meshData.set(
-          meshDecoder.mesh(),
-          attCornerTable,
-          encodingData.encodedAttributeValueIndexToCornerMap,
-          encodingData.vertexToEncodedAttributeValueIndexMap
-        );
-      } else {
-        meshData.set(
-          meshDecoder.mesh(),
-          cornerTable,
-          encodingData.encodedAttributeValueIndexToCornerMap,
-          encodingData.vertexToEncodedAttributeValueIndexMap
-        );
-      }
+      meshData.set(
+        meshDecoder.mesh(),
+        attCornerTable !== null ? attCornerTable : cornerTable,
+        encodingData.encodedAttributeValueIndexToCornerMap,
+        encodingData.vertexToEncodedAttributeValueIndexMap
+      );
 
       const transformType = transform.getType ? transform.getType() : -1;
       const ret = createMeshPredictionSchemeDecoder(
-        method, att, transform, meshData,
-        decoder.bitstreamVersion(), transformType
+        method, att, transform, meshData, transformType
       );
       if (ret !== null) return ret;
     }
