@@ -26,10 +26,6 @@ class PointCloudDecoder {
     this._attributeToDecoderMap = [];
   }
 
-  getGeometryType() {
-    return EncodedGeometryType.POINT_CLOUD;
-  }
-
   // Returns a Status; on success outHeader is populated.
   static decodeHeader(buffer, outHeader) {
     const kIoErrorMsg = 'Failed to parse Draco header.';
@@ -135,10 +131,6 @@ class PointCloudDecoder {
     return okStatus();
   }
 
-  bitstreamVersion() {
-    return DRACO_BITSTREAM_VERSION(this._versionMajor, this._versionMinor);
-  }
-
   setAttributesDecoder(attDecoderId, decoder) {
     if (attDecoderId < 0) {
       return false;
@@ -182,11 +174,6 @@ class PointCloudDecoder {
 
   initializeDecoder() {
     return true;
-  }
-
-  // Must be implemented by derived classes.
-  createAttributesDecoder(/* attDecoderId */) {
-    return false;
   }
 
   decodeGeometryData() {

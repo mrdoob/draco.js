@@ -148,10 +148,6 @@ class PointAttribute extends GeometryAttribute {
           outVal[i] = dv.getInt16(bytePos + i * 2, true); break;
         case DataType.UINT16:
           outVal[i] = dv.getUint16(bytePos + i * 2, true); break;
-        case DataType.INT32:
-          outVal[i] = dv.getInt32(bytePos + i * 4, true); break;
-        case DataType.UINT32:
-          outVal[i] = dv.getUint32(bytePos + i * 4, true); break;
         case DataType.FLOAT64:
           outVal[i] = dv.getFloat64(bytePos + i * 8, true); break;
         default:

@@ -13,21 +13,15 @@ class MeshEdgebreakerTraversalDecoder {
     this._startFaceDecoder = null; // RAnsBitDecoder
     this._attributeConnectivityDecoders = null; // Array of RAnsBitDecoder
     this._numAttributeData = 0;
-    this._decoderImpl = null;
   }
 
   init(decoder) {
-    this._decoderImpl = decoder;
     const srcBuffer = decoder.getDecoder().buffer();
     this._buffer.init(
       srcBuffer.dataHead,
       srcBuffer.remainingSize,
       srcBuffer.bitstreamVersion
     );
-  }
-
-  bitstreamVersion() {
-    return this._decoderImpl.getDecoder().bitstreamVersion();
   }
 
   // Ignored by default; overridden by predictive/valence decoders.

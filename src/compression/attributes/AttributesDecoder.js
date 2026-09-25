@@ -1,16 +1,14 @@
 // compression/attributes/AttributesDecoder.js - ported from compression/attributes/attributes_decoder.h/cc
 
-import { AttributesDecoderInterface } from './AttributesDecoderInterface.js';
 import { GeometryAttribute, GeometryAttributeType } from '../../attributes/GeometryAttribute.js';
 import { PointAttribute } from '../../attributes/PointAttribute.js';
 import { DataType, dataTypeLength } from '../../core/DracoTypes.js';
 import { decodeVarint } from '../../core/VarintDecoding.js';
 
 // Base class for AttributesDecoders; shared functionality for all of them.
-class AttributesDecoder extends AttributesDecoderInterface {
+class AttributesDecoder {
 
   constructor() {
-    super();
     this._pointAttributeIds = [];
     // Inverse of _pointAttributeIds: point attribute id -> local id.
     this._pointAttributeToLocalIdMap = [];
@@ -123,19 +121,6 @@ class AttributesDecoder extends AttributesDecoderInterface {
       return -1;
     }
     return this._pointAttributeToLocalIdMap[pointAttributeId];
-  }
-
-  // Must be overridden by derived classes.
-  decodePortableAttributes(buffer) {
-    return false;
-  }
-
-  decodeDataNeededByPortableTransforms(buffer) {
-    return true;
-  }
-
-  transformAttributesToOriginalFormat() {
-    return true;
   }
 
 }

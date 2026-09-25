@@ -749,10 +749,6 @@ class PointCloudDecoder {
     this._attributeToDecoderMap = [];
   }
 
-  getGeometryType() {
-    return EncodedGeometryType.POINT_CLOUD;
-  }
-
   // Returns a Status; on success outHeader is populated.
   static decodeHeader(buffer, outHeader) {
     const kIoErrorMsg = 'Failed to parse Draco header.';
@@ -858,10 +854,6 @@ class PointCloudDecoder {
     return okStatus();
   }
 
-  bitstreamVersion() {
-    return DRACO_BITSTREAM_VERSION(this._versionMajor, this._versionMinor);
-  }
-
   setAttributesDecoder(attDecoderId, decoder) {
     if (attDecoderId < 0) {
       return false;
@@ -905,11 +897,6 @@ class PointCloudDecoder {
 
   initializeDecoder() {
     return true;
-  }
-
-  // Must be implemented by derived classes.
-  createAttributesDecoder(/* attDecoderId */) {
-    return false;
   }
 
   decodeGeometryData() {
@@ -1024,11 +1011,6 @@ class MeshDecoder extends PointCloudDecoder {
       return false;
     }
     return super.decodeGeometryData();
-  }
-
-  // Overridden by derived classes.
-  decodeConnectivity() {
-    return false;
   }
 
 }
@@ -1437,46 +1419,6 @@ function decodeRawSymbols(numValues, srcBuffer, outValues) {
   return decodeRawSymbolsInternal(maxBitLength, numValues, srcBuffer, outValues);
 }
 
-// compression/attributes/AttributesDecoderInterface.js - ported from compression/attributes/attributes_decoder_interface.h
-
-// Abstract interface used by PointCloudDecoder; methods must be overridden.
-class AttributesDecoderInterface {
-
-  constructor() {
-  }
-
-  init(decoder, pointCloud) {
-    return false;
-  }
-
-  decodeAttributesDecoderData(buffer) {
-    return false;
-  }
-
-  decodeAttributes(buffer) {
-    return false;
-  }
-
-  getAttributeId(i) {
-    return -1;
-  }
-
-  getNumAttributes() {
-    return 0;
-  }
-
-  getDecoder() {
-    return null;
-  }
-
-  // Attribute data in portable (post-transform) format; identical on encoder
-  // and decoder, so usable by predictors.
-  getPortableAttribute(pointAttributeId) {
-    return null;
-  }
-
-}
-
 // core/DracoTypes.js - ported from draco_types.h/cc
 
 const DataType = {
@@ -1801,10 +1743,6 @@ class PointAttribute extends GeometryAttribute {
           outVal[i] = dv.getInt16(bytePos + i * 2, true); break;
         case DataType.UINT16:
           outVal[i] = dv.getUint16(bytePos + i * 2, true); break;
-        case DataType.INT32:
-          outVal[i] = dv.getInt32(bytePos + i * 4, true); break;
-        case DataType.UINT32:
-          outVal[i] = dv.getUint32(bytePos + i * 4, true); break;
         case DataType.FLOAT64:
           outVal[i] = dv.getFloat64(bytePos + i * 8, true); break;
         default:
@@ -1980,10 +1918,9 @@ class PointAttribute extends GeometryAttribute {
 
 
 // Base class for AttributesDecoders; shared functionality for all of them.
-class AttributesDecoder extends AttributesDecoderInterface {
+class AttributesDecoder {
 
   constructor() {
-    super();
     this._pointAttributeIds = [];
     // Inverse of _pointAttributeIds: point attribute id -> local id.
     this._pointAttributeToLocalIdMap = [];
@@ -2096,19 +2033,6 @@ class AttributesDecoder extends AttributesDecoderInterface {
       return -1;
     }
     return this._pointAttributeToLocalIdMap[pointAttributeId];
-  }
-
-  // Must be overridden by derived classes.
-  decodePortableAttributes(buffer) {
-    return false;
-  }
-
-  decodeDataNeededByPortableTransforms(buffer) {
-    return true;
-  }
-
-  transformAttributesToOriginalFormat() {
-    return true;
   }
 
 }
@@ -2228,53 +2152,15 @@ class SequentialAttributeDecoder {
 
 }
 
-// compression/attributes/prediction_schemes/PredictionSchemeDecoderInterface.js - ported from compression/attributes/prediction_schemes/prediction_scheme_decoder_interface.h
-
-/**
- * Abstract interface for prediction schemes used during attribute decoding.
- */
-class PredictionSchemeDecoderInterface {
-
-  /** True if all correction values are guaranteed to be positive. */
-  areCorrectionsPositive() {
-    return false;
-  }
-
-  getNumParentAttributes() {
-    return 0;
-  }
-
-  getParentAttributeType(i) {
-    return -1; // INVALID
-  }
-
-  setParentAttribute(att) {
-    return false;
-  }
-
-  decodePredictionData(buffer) {
-    return true;
-  }
-
-  /** Reverts the prediction applied during encoding, writing original values to outData. */
-  computeOriginalValues(inCorr, outData, size, numComponents, entryToPointIdMap) {
-    return false;
-  }
-
-}
-
 // compression/attributes/prediction_schemes/PredictionSchemeDecoder.js - ported from compression/attributes/prediction_schemes/prediction_scheme_decoder.h
-
 
 /**
  * Base class for typed prediction scheme decoders. C++ templates this on
  * <DataTypeT, TransformT>; here the transform is a constructor param.
  */
-class PredictionSchemeDecoder extends PredictionSchemeDecoderInterface {
+class PredictionSchemeDecoder {
 
   constructor(attribute, transform) {
-    super();
-    this._attribute = attribute;
     this._transform = transform;
   }
 
@@ -3881,14 +3767,12 @@ class MeshPredictionSchemeGeometricNormalDecoder extends MeshPredictionSchemeDec
 class MeshPredictionSchemeData {
 
   constructor() {
-    this._mesh = null;
     this._cornerTable = null;
     this._vertexToDataMap = null;
     this._dataToCornerMap = null;
   }
 
-  set(mesh, cornerTable, dataToCornerMap, vertexToDataMap) {
-    this._mesh = mesh;
+  set(cornerTable, dataToCornerMap, vertexToDataMap) {
     this._cornerTable = cornerTable;
     this._dataToCornerMap = dataToCornerMap;
     this._vertexToDataMap = vertexToDataMap;
@@ -3973,7 +3857,6 @@ function createPredictionSchemeForDecoder(method, attId, decoder, transform) {
       const attCornerTable = meshDecoder.getAttributeCornerTable(attId);
 
       meshData.set(
-        meshDecoder.mesh(),
         attCornerTable !== null ? attCornerTable : cornerTable,
         encodingData.encodedAttributeValueIndexToCornerMap,
         encodingData.vertexToEncodedAttributeValueIndexMap
@@ -5784,10 +5667,8 @@ class MeshTraversalSequencer {
 // Used to generate encoding/decoding order for attribute values.
 class MeshAttributeIndicesEncodingObserver {
 
-  constructor(attConnectivity, mesh, sequencer, encodingData) {
-    this._attConnectivity = attConnectivity;
+  constructor(mesh, sequencer, encodingData) {
     this._encodingData = encodingData;
-    this._mesh = mesh;
     this._sequencer = sequencer;
     this._vertexToEncodedMap = encodingData.vertexToEncodedAttributeValueIndexMap;
     this._encodedToCornerMap = encodingData.encodedAttributeValueIndexToCornerMap;
@@ -6218,7 +6099,7 @@ class MeshEdgebreakerDecoderImpl {
       mesh, encodingData, this._vertexTraversalCache);
 
     const observer = new MeshAttributeIndicesEncodingObserver(
-      cornerTable, mesh, traversalSequencer, encodingData);
+      mesh, traversalSequencer, encodingData);
 
     const traverser =
       traversalMethod === MeshTraversalMethod.MESH_TRAVERSAL_PREDICTION_DEGREE
@@ -7155,21 +7036,15 @@ class MeshEdgebreakerTraversalDecoder {
     this._startFaceDecoder = null; // RAnsBitDecoder
     this._attributeConnectivityDecoders = null; // Array of RAnsBitDecoder
     this._numAttributeData = 0;
-    this._decoderImpl = null;
   }
 
   init(decoder) {
-    this._decoderImpl = decoder;
     const srcBuffer = decoder.getDecoder().buffer();
     this._buffer.init(
       srcBuffer.dataHead,
       srcBuffer.remainingSize,
       srcBuffer.bitstreamVersion
     );
-  }
-
-  bitstreamVersion() {
-    return this._decoderImpl.getDecoder().bitstreamVersion();
   }
 
   // Ignored by default; overridden by predictive/valence decoders.

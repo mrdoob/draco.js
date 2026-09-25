@@ -1,16 +1,12 @@
 // compression/attributes/prediction_schemes/PredictionSchemeDecoder.js - ported from compression/attributes/prediction_schemes/prediction_scheme_decoder.h
 
-import { PredictionSchemeDecoderInterface } from './PredictionSchemeDecoderInterface.js';
-
 /**
  * Base class for typed prediction scheme decoders. C++ templates this on
  * <DataTypeT, TransformT>; here the transform is a constructor param.
  */
-class PredictionSchemeDecoder extends PredictionSchemeDecoderInterface {
+class PredictionSchemeDecoder {
 
   constructor(attribute, transform) {
-    super();
-    this._attribute = attribute;
     this._transform = transform;
   }
 

@@ -159,7 +159,7 @@ class MeshEdgebreakerDecoderImpl {
       mesh, encodingData, this._vertexTraversalCache);
 
     const observer = new MeshAttributeIndicesEncodingObserver(
-      cornerTable, mesh, traversalSequencer, encodingData);
+      mesh, traversalSequencer, encodingData);
 
     const traverser =
       traversalMethod === MeshTraversalMethod.MESH_TRAVERSAL_PREDICTION_DEGREE

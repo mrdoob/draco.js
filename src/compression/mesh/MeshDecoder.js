@@ -45,11 +45,6 @@ class MeshDecoder extends PointCloudDecoder {
     return super.decodeGeometryData();
   }
 
-  // Overridden by derived classes.
-  decodeConnectivity() {
-    return false;
-  }
-
 }
 
 export { MeshDecoder };

@@ -4,10 +4,8 @@
 // Used to generate encoding/decoding order for attribute values.
 class MeshAttributeIndicesEncodingObserver {
 
-  constructor(attConnectivity, mesh, sequencer, encodingData) {
-    this._attConnectivity = attConnectivity;
+  constructor(mesh, sequencer, encodingData) {
     this._encodingData = encodingData;
-    this._mesh = mesh;
     this._sequencer = sequencer;
     this._vertexToEncodedMap = encodingData.vertexToEncodedAttributeValueIndexMap;
     this._encodedToCornerMap = encodingData.encodedAttributeValueIndexToCornerMap;

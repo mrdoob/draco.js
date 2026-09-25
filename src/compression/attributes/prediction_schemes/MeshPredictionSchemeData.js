@@ -6,14 +6,12 @@
 class MeshPredictionSchemeData {
 
   constructor() {
-    this._mesh = null;
     this._cornerTable = null;
     this._vertexToDataMap = null;
     this._dataToCornerMap = null;
   }
 
-  set(mesh, cornerTable, dataToCornerMap, vertexToDataMap) {
-    this._mesh = mesh;
+  set(cornerTable, dataToCornerMap, vertexToDataMap) {
     this._cornerTable = cornerTable;
     this._dataToCornerMap = dataToCornerMap;
     this._vertexToDataMap = vertexToDataMap;

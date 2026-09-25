@@ -77,7 +77,6 @@ function createPredictionSchemeForDecoder(method, attId, decoder, transform) {
       const attCornerTable = meshDecoder.getAttributeCornerTable(attId);
 
       meshData.set(
-        meshDecoder.mesh(),
         attCornerTable !== null ? attCornerTable : cornerTable,
         encodingData.encodedAttributeValueIndexToCornerMap,
         encodingData.vertexToEncodedAttributeValueIndexMap
