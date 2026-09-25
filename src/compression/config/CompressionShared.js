@@ -67,7 +67,6 @@ export const MeshEdgebreakerConnectivityEncodingMethod = {
 export class DracoHeader {
 
   constructor() {
-    this.dracoString = new Int8Array(5);
     this.versionMajor = 0;
     this.versionMinor = 0;
     this.encoderType = 0;

@@ -69,7 +69,6 @@ const MeshEdgebreakerConnectivityEncodingMethod = {
 class DracoHeader {
 
   constructor() {
-    this.dracoString = new Int8Array(5);
     this.versionMajor = 0;
     this.versionMinor = 0;
     this.encoderType = 0;
@@ -755,9 +754,6 @@ class PointCloudDecoder {
     const bytes = buffer.decodeBytes(5);
     if (bytes === undefined) {
       return new Status(StatusCode.IO_ERROR, kIoErrorMsg);
-    }
-    for (let i = 0; i < 5; i++) {
-      outHeader.dracoString[i] = bytes[i];
     }
     const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3], bytes[4]);
     if (magic !== 'DRACO') {
