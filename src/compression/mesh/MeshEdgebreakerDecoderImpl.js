@@ -766,6 +766,21 @@ class MeshEdgebreakerDecoderImpl {
     // length (the running point id), so track it as a counter, not an array.
     const attributeData = this._attributeData;
     const numAttrData = attributeData.length;
+    let allBaseVertices = true;
+    for (let i = 0; i < numAttrData; ++i) {
+      if (!attributeData[i].connectivityData._hasCompactBaseVertices) {
+        allBaseVertices = false;
+        break;
+      }
+    }
+    if (allBaseVertices) {
+      // With no interior attribute seams, final point IDs have the same dense
+      // base-vertex numbering as the compact attribute connectivity.
+      const connectivity = attributeData[0].connectivityData;
+      mesh.faces_.set(connectivity.cornerToVertexArray());
+      this._decoder.pointCloud().setNumPoints(connectivity.numVertices());
+      return true;
+    }
     let numPoints = 0;
     // A corner's final point id is also its face-index entry. Write into the
     // output buffer directly; the connectivity being traversed is separate.

@@ -4975,6 +4975,7 @@ class MeshAttributeCornerTable {
     this.vertex_to_left_most_corner_map_ = [];
     // Lazily built; see oppositeCornerArray.
     this._effectiveOpposite = null;
+    this._hasCompactBaseVertices = false;
     this.corner_table_ = table;
     this.no_interior_seams_ = true;
     return true;
@@ -5009,7 +5010,63 @@ class MeshAttributeCornerTable {
 
   recomputeVertices() {
 
+    this._hasCompactBaseVertices = false;
+    if (this.no_interior_seams_ && this._recomputeBaseVertices()) {
+      return true;
+    }
     return this._recomputeVerticesInternal();
+
+  }
+
+  // With boundary seams only, attribute vertices are the non-isolated base
+  // vertices in ascending order. Preserve that dense numbering with a flat
+  // remap instead of walking each vertex ring.
+  _recomputeBaseVertices() {
+
+    const ct = this.corner_table_;
+    const numVertices = ct.numVertices();
+    const numCorners = ct.numCorners();
+    const baseCorners = ct.cornerToVertexArray();
+    const baseOpposite = ct.oppositeCornerArray();
+    const baseLeftmost = ct.vertexLeftmostCornerArray();
+    const compact = new Int32Array(numVertices).fill(kInvalidVertexIndex);
+    let numNewVertices = 0;
+
+    for (let v = 0; v < numVertices; ++v) {
+      const c = baseLeftmost[v];
+      if (c === kInvalidCornerIndex$1) continue;
+      if (c < 0 || c >= numCorners || baseCorners[c] !== v) return false;
+      // CornerTable guarantees a boundary vertex's leftmost corner is at its
+      // boundary end. Keep the original ring walk for unusual input that does
+      // not satisfy that invariant, including its malformed-cycle rejection.
+      if (this.is_vertex_on_seam_[v]) {
+        const next = c % 3 === 2 ? c - 2 : c + 1;
+        if (baseOpposite[next] !== kInvalidCornerIndex$1) return false;
+      }
+      compact[v] = numNewVertices++;
+    }
+
+    const cornerToVertex = new Int32Array(numCorners);
+    for (let c = 0; c < numCorners; ++c) {
+      const v = baseCorners[c];
+      if (v < 0 || v >= numVertices || compact[v] === kInvalidVertexIndex) {
+        return false;
+      }
+      cornerToVertex[c] = compact[v];
+    }
+    const leftmost = new Int32Array(numNewVertices);
+    for (let v = 0; v < numVertices; ++v) {
+      if (compact[v] !== kInvalidVertexIndex) {
+        leftmost[compact[v]] = baseLeftmost[v];
+      }
+    }
+
+    this.corner_to_vertex_map_ = cornerToVertex;
+    this.vertex_to_left_most_corner_map_ = leftmost;
+    // Boundary opposites are already -1, so no seam-masked copy is needed.
+    this._effectiveOpposite = baseOpposite;
+    this._hasCompactBaseVertices = true;
+    return true;
 
   }
 
@@ -5205,6 +5262,7 @@ class MeshAttributeCornerTable {
     this.vertex_to_left_most_corner_map_ = other.vertex_to_left_most_corner_map_;
     this.no_interior_seams_ = other.no_interior_seams_;
     this._effectiveOpposite = other._effectiveOpposite;
+    this._hasCompactBaseVertices = other._hasCompactBaseVertices;
   }
 
 }
@@ -5962,6 +6020,21 @@ class MeshEdgebreakerDecoderImpl {
     // length (the running point id), so track it as a counter, not an array.
     const attributeData = this._attributeData;
     const numAttrData = attributeData.length;
+    let allBaseVertices = true;
+    for (let i = 0; i < numAttrData; ++i) {
+      if (!attributeData[i].connectivityData._hasCompactBaseVertices) {
+        allBaseVertices = false;
+        break;
+      }
+    }
+    if (allBaseVertices) {
+      // With no interior attribute seams, final point IDs have the same dense
+      // base-vertex numbering as the compact attribute connectivity.
+      const connectivity = attributeData[0].connectivityData;
+      mesh.faces_.set(connectivity.cornerToVertexArray());
+      this._decoder.pointCloud().setNumPoints(connectivity.numVertices());
+      return true;
+    }
     let numPoints = 0;
     // A corner's final point id is also its face-index entry. Write into the
     // output buffer directly; the connectivity being traversed is separate.
