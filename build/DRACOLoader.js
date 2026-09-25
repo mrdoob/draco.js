@@ -5232,6 +5232,11 @@ class MeshSequentialDecoder extends MeshDecoder {
       return false;
     }
 
+    // Reserve once without changing the count: addFace still appends and keeps
+    // partial-decode behavior, without copying the entire buffer for each face.
+    const mesh = this.mesh();
+    mesh._ensureFaceCapacity(mesh.numFaces() + numFaces);
+
     if (connectivityMethod === 0) {
       if (!this._decodeAndDecompressIndices(numFaces)) {
         return false;
