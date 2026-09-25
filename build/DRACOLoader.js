@@ -4464,7 +4464,9 @@ class DepthFirstTraverser {
     const cornerTable = this._cornerTable;
     this._isFaceVisited = new Uint8Array(cornerTable.numFaces());
     this._isVertexVisited = new Uint8Array(cornerTable.numVertices());
-    this._cornerTraversalStack = new Int32Array(this._numCorners);
+    // Storage follows traversal depth, which is usually much smaller than the
+    // number of mesh corners. Grow only when a branch needs another slot.
+    this._cornerTraversalStack = new Int32Array(64);
     this._numVisitedFaces = 0;
   }
   onTraversalEnd() {}
@@ -4480,7 +4482,7 @@ class DepthFirstTraverser {
     const cornerToVertex = this._cornerToVertex;
     const oppositeCorners = this._oppositeCorners;
     const vertexLeftmost = this._vertexLeftmost;
-    const stack = this._cornerTraversalStack;
+    let stack = this._cornerTraversalStack;
     let numVisitedFaces = this._numVisitedFaces;
 
     let stackSize = 0;
@@ -4572,6 +4574,11 @@ class DepthFirstTraverser {
           } else {
             // Both neighbors unvisited: continue left, push right to resume later.
             stack[stackSize - 1] = leftCornerId;
+            if (stackSize === stack.length) {
+              const grown = new Int32Array(stack.length * 2);
+              grown.set(stack);
+              this._cornerTraversalStack = stack = grown;
+            }
             stack[stackSize++] = rightCornerId;
             break;
           }
