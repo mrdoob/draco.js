@@ -763,12 +763,7 @@ class MeshEdgebreakerDecoderImpl {
       const numFaces = mesh.numFaces();
       const faces = mesh.faces_;
       const baseCornerToVertex = ct.cornerToVertexArray();
-      for (let f = 0; f < numFaces; ++f) {
-        const startCorner = 3 * f;
-        faces[startCorner] = baseCornerToVertex[startCorner];
-        faces[startCorner + 1] = baseCornerToVertex[startCorner + 1];
-        faces[startCorner + 2] = baseCornerToVertex[startCorner + 2];
-      }
+      faces.set(baseCornerToVertex.subarray(0, numFaces * 3));
       this._decoder.pointCloud().setNumPoints(numConnectivityVerts);
       return true;
     }
